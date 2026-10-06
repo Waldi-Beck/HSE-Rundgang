@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "anthropic.claude-code",
+    "bradlc.vscode-tailwindcss",
+    "vitest.explorer",
+    "ms-playwright.playwright",
+    "esbenp.prettier-vscode"
+  ]
+}
