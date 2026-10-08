@@ -1,5 +1,6 @@
 import { Plus } from '@phosphor-icons/react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { Link } from 'react-router';
 import { db } from '../../db';
 import type { Defect, Walk } from '../../lib/types';
 import { DefectRow } from '../../components/DefectRow';
@@ -47,6 +48,7 @@ export function DefectsTab({
           ))}
         </ul>
       )}
+      <Link to={`/rundgang/${walk.id}/abschluss`} replace className="btn-primary w-full" data-testid="continue-to-close">Weiter zum Abschluss</Link>
     </div>
   );
 }

@@ -99,7 +99,8 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
 
   await page.getByRole('link', { name: /3\. Mängel/ }).click();
   await expect(page.getByText(/2026-\d{2}-\d{2}-M01/).first()).toBeVisible();
-  await page.getByRole('link', { name: /4\. Abschluss/ }).click();
+  await page.getByTestId('continue-to-close').click();
+  await expect(page.getByRole('heading', { name: '4. Abschluss' })).toBeVisible();
   await page.getByTestId('close-walk').click();
   await expect(page.getByTestId('close-errors')).toContainText('Unterschrift');
   await page.getByRole('radio', { name: /offenen Massnahmen/i }).click();

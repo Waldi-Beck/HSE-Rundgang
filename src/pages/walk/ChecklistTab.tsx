@@ -163,7 +163,7 @@ export function ChecklistTab({
       {next ? (
         <button type="button" className="btn-primary w-full" onClick={() => goTo(next.id)} data-testid="next-area">Weiter: {next.label}</button>
       ) : (
-        <Link to={`/rundgang/${walk.id}/maengel`} replace className="btn-primary w-full">Weiter zu Mängeln</Link>
+        <Link to={`/rundgang/${walk.id}/abschluss`} replace className="btn-primary w-full" data-testid="continue-to-close">Weiter zum Abschluss</Link>
       )}
     </div>
   );
