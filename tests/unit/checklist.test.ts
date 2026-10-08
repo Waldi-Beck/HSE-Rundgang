@@ -1,64 +1,57 @@
 import { describe, expect, it } from 'vitest';
-import {
-  ALL_ITEMS,
-  AREAS,
-  CHANGE_LOG,
-  LEGAL_BASES,
-  MONTHLY_ITEMS,
-  SOP_META,
-  WEEKLY_ITEMS,
-  legalBasisOf,
-} from '../../src/data/checklist';
+import { ALL_ITEMS, FORM_AREAS, MONTHLY_ITEMS, SOP_META, WEEKLY_ITEMS } from '../../src/data/checklist';
+import { REGISTER_AREA_DEFAULTS } from '../../src/data/register';
 
-describe('Checklisten-Definition (Formular vom 29.09.2026)', () => {
-  it('Kopfdaten unverändert: Dokumenten ID, Version, Gültig ab', () => {
-    expect(SOP_META).toMatchObject({
-      docId: 'QPS_HSE_00064',
-      title: 'HSE Wöchentlicher Rundgang',
-      version: '1.0',
-      validFrom: '2026-10-05',
-    });
+describe('Checklist source from current form and Excel Grundlagen', () => {
+  it('keeps the requested SOP metadata and new title', () => {
+    expect(SOP_META).toMatchObject({ docId: 'QPS_HSE_00064', title: 'HSE Rundgang', version: '1.0', validFrom: '2026-10-05' });
   });
 
-  it('2.1: W1 bis W16, 2.2: M1 bis M9', () => {
-    expect(WEEKLY_ITEMS.map((i) => i.id)).toEqual(Array.from({ length: 16 }, (_, i) => `W${i + 1}`));
-    expect(MONTHLY_ITEMS.map((i) => i.id)).toEqual(Array.from({ length: 9 }, (_, i) => `M${i + 1}`));
-    expect(new Set(ALL_ITEMS.map((i) => i.id)).size).toBe(25);
+  it('contains exactly fifteen R points in each of five areas and nine M points', () => {
+    expect(FORM_AREAS.map((area) => area.label)).toEqual(['Engineering', 'QLabs', 'QMeasure', 'xTec Lager', 'xTec Werkstatt']);
+    expect(WEEKLY_ITEMS.map((item) => item.id)).toEqual(Array.from({ length: 15 }, (_, i) => `R${i + 1}`));
+    expect(MONTHLY_ITEMS.map((item) => item.id)).toEqual(Array.from({ length: 9 }, (_, i) => `M${i + 1}`));
+    expect(WEEKLY_ITEMS.length * FORM_AREAS.length).toBe(75);
+    expect(ALL_ITEMS).toHaveLength(24);
   });
 
-  it('6 Bereiche in der Reihenfolge des Formulars, IDs ohne "@"', () => {
-    expect(AREAS.map((a) => a.label)).toEqual(['Gänge / Treppen', 'Engineering', 'QLabs', 'QMeasure', 'xTec Lager', 'xTec Werkstatt']);
-    for (const a of AREAS) expect(a.id).toMatch(/^[a-z-]+$/);
-    expect(WEEKLY_ITEMS.length * AREAS.length + MONTHLY_ITEMS.length).toBe(105);
+  it('includes exactly the seven populated Excel register-area defaults', () => {
+    expect(REGISTER_AREA_DEFAULTS).toEqual(['Engineering', 'QLabs', 'QMeasure', 'xTec Lager', 'xTec Werkstatt', 'Büro / Verwaltung', 'Aussenbereich']);
   });
 
-  it('Stichproben Wortlaut', () => {
-    expect(WEEKLY_ITEMS[0].text).toBe('Fluchtwege frei, mind. 1,2 m breit');
-    expect(WEEKLY_ITEMS[11].text).toBe('Abfall getrennt, nicht überfüllt; Glasbruch im stichfesten Behälter');
-    expect(MONTHLY_ITEMS[8].text).toBe('Gefahrstoffschrank geordnet, unverträgliche Stoffe getrennt');
-    expect(CHANGE_LOG).toEqual([{ version: 'V1.0', description: 'Erstversion vom 29.09.2026' }]);
+  it('has non-empty literal Excel foundation text on every checklist point', () => {
+    expect(ALL_ITEMS.every((item) => item.basis.trim().length > 0)).toBe(true);
+    expect(new Set(ALL_ITEMS.map((item) => item.id)).size).toBe(24);
+    expect(WEEKLY_ITEMS[3]).toMatchObject({ id: 'R4', text: 'Feuerlöscher am Platz und frei zugänglich', basis: 'VKF-Brandschutzvorschriften (BSV 2015)' });
+    expect(MONTHLY_ITEMS[8].id).toBe('M9');
   });
 
-  it('Schweizer Schreibweise: kein "ß"', () => {
-    for (const i of ALL_ITEMS) expect(i.text).not.toContain('ß');
-    for (const l of LEGAL_BASES) expect(l.text).not.toContain('ß');
-  });
-
-  it('Grundlagen: jeder Punkt genau einmal zugeordnet', () => {
-    const mapped = LEGAL_BASES.flatMap((l) => l.ids);
-    expect(new Set(mapped).size).toBe(mapped.length);
-    expect([...mapped].sort()).toEqual(ALL_ITEMS.map((i) => i.id).sort());
-    for (const i of ALL_ITEMS) expect(legalBasisOf(i.id)).not.toBe('');
-  });
-
-  it('Grundlagen: Spaltentext und ausgeschriebene IDs stimmen überein', () => {
-    const expand = (points: string) =>
-      points.split(', ').flatMap((p) => {
-        const m = p.match(/^W(\d+)–W(\d+)$/);
-        return m ? Array.from({ length: +m[2] - +m[1] + 1 }, (_, k) => `W${+m[1] + k}`) : [p];
-      });
-    for (const l of LEGAL_BASES) expect(expand(l.points)).toEqual(l.ids);
-    expect(legalBasisOf('W2')).toMatch(/^ArGV 4 Art. 8/);
-    expect(legalBasisOf('M7')).toMatch(/UVG Art. 82/);
+  it('maps each R/M point to the literal basis copied from Excel Grundlagen', () => {
+    expect(ALL_ITEMS.map(({ id, basis }) => [id, basis])).toEqual([
+      ['R1', 'ArGV 4 Art. 8 (Fluchtwege) und Art. 10 (Türen in Fluchtwegen) · Suva-Checkliste 67157 „Fluchtwege“'],
+      ['R2', 'ArGV 4 Art. 8 (Fluchtwege) und Art. 10 (Türen in Fluchtwegen) · Suva-Checkliste 67157 „Fluchtwege“'],
+      ['R3', 'ArGV 4 Art. 8 (Fluchtwege) und Art. 10 (Türen in Fluchtwegen) · Suva-Checkliste 67157 „Fluchtwege“'],
+      ['R4', 'VKF-Brandschutzvorschriften (BSV 2015)'],
+      ['R5', 'VKF-Brandschutzvorschriften (BSV 2015)'],
+      ['R6', 'VUV Art. 19 (Verkehrswege) · Suva-Checkliste 67001 „Verkehrswege für Personen“'],
+      ['R7', 'NIV (Niederspannungs-Installationsverordnung)'],
+      ['R8', 'NIV (Niederspannungs-Installationsverordnung)'],
+      ['R9', 'VUV Art. 5 (PSA) · UVG Art. 82 (Pflicht zum Tragen) · Suva-Checkliste 67091 „Persönliche Schutzausrüstungen“'],
+      ['R10', 'VUV Art. 5 (PSA) · UVG Art. 82 (Pflicht zum Tragen) · Suva-Checkliste 67091 „Persönliche Schutzausrüstungen“'],
+      ['R11', 'ChemV · ArGV 3 Art. 24a'],
+      ['R12', 'VVEA / VVA (Abfälle, Sonderabfälle)'],
+      ['R13', 'VUV (sichere Lagerung, Arbeitsmittel)'],
+      ['R14', 'ArGV 3 Art. 36 (Erste Hilfe)'],
+      ['R15', 'ArGV 3 Art. 15 (Beleuchtung) · VUV Art. 19 (Verkehrswege)'],
+      ['M1', 'ArGV 3 Art. 36 (Erste Hilfe)'],
+      ['M2', 'VKF-Brandschutzvorschriften (BSV 2015)'],
+      ['M3', 'ArGV 4 Art. 8 (Fluchtwege) und Art. 10 (Türen in Fluchtwegen) · Suva-Checkliste 67157 „Fluchtwege“'],
+      ['M4', 'VKF-Brandschutzvorschriften (BSV 2015)'],
+      ['M5', 'Notfallorganisation nach EKAS-Richtlinie 6508'],
+      ['M6', 'Notfallorganisation nach EKAS-Richtlinie 6508'],
+      ['M7', 'VUV Art. 5 (PSA) · UVG Art. 82 (Pflicht zum Tragen) · Suva-Checkliste 67091 „Persönliche Schutzausrüstungen“'],
+      ['M8', 'VUV (sichere Lagerung, Arbeitsmittel)'],
+      ['M9', 'ChemV · ArGV 3 Art. 24a'],
+    ]);
   });
 });

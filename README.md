@@ -1,24 +1,17 @@
 # HSE-Rundgang App (QPS_HSE_00064)
 
-Mobile Web-App für den **wöchentlichen HSE-Rundgang** der QPS Engineering AG, Stein (CH).
-Sie bildet die SOP **QPS_HSE_00064 "HSE Wöchentlicher Rundgang"**, Version 1.0, gültig ab 05.10.2026, ab
-(`docs/sop/QPS_HSE_00064_HSE_Rundgang_V1.0.docx`).
+Mobile Web-App und Register für den **HSE Rundgang** der QPS Engineering AG, Stein (CH).
+Sie bildet SOP **QPS_HSE_00064**, Version 1.0, gültig ab 05.10.2026, nach der aktuellen DOTX-Form und dem Excel-Register ab.
+Das vorhandene DOCX im Ordner `docs/sop` enthält eine ältere Formularfassung. Word- und Excel-Quelldateien bleiben unverändert.
 
 Der Rundgang wird direkt am Smartphone oder Tablet erfasst:
 
-- **Kapitel 1 Rundgangdaten**: Datum, Kalenderwoche (automatisch nach ISO 8601), Durchgeführt von, Uhrzeit, Begleitperson.
-  Die App schlägt beim ersten Rundgang im Monat den **Monatsrundgang (2.1 + 2.2)** vor, sonst den **Wochenrundgang (2.1)**.
-  Offene Mängel früherer Rundgänge erscheinen unter "Offene Punkte Vorwoche" und können dort nachkontrolliert werden.
-- **Kapitel 2 Checkliste, Raum für Raum**: 2.1 Wöchentlich, W1 bis W16 je Bereich (Gänge / Treppen, Engineering, QLabs, QMeasure,
-  xTec Lager, xTec Werkstatt, also 96 Felder); beim Monatsrundgang zusätzlich 2.2 Monatlich (M1 bis M9).
-  Bewertung OK / Mangel / n.a. mit grossen Tasten, Rechtsgrundlage je Punkt, "Rest OK" je Bereich.
-  "Mangel" öffnet direkt das Mängel-Formular mit Punkt und Bereich.
-- **Kapitel 3 Ergebnis**: Anzahl Mängel, davon kritisch (K), Vorschlag für das Gesamtergebnis, Unterschrift am Bildschirm (Durchführende/r, optional Kenntnisnahme).
-  Abschluss nur, wenn alles vollständig ist; danach schreibgeschützt.
-- **Kapitel 4 Mängel und Massnahmen**: Nr. / Pkt. / Bereich, Mangel/Gefahr, Massnahme, Verantwortlich, Prio K/H/M/N mit automatischem Fristvorschlag
-  (sofort / 48 Std. / 1 Woche / 1 Monat) und **Fotos direkt aus der Kamera** (werden auf 1600 px verkleinert).
-- **Mängelregister**: alle Mängel über alle Rundgänge mit Punkt und Bereich, offen/erledigt, überfällige Fristen, CSV-Export für Excel.
-- **PDF-Bericht** im Aufbau der Vorlage, inklusive Fotos und Unterschrift, Dateiname `HSE-Rundgang_JJJJ-KWxx.pdf` (SOP Kapitel 5).
+- **Kapitel 1 Rundgangdaten**: Datum, ISO-KW, Beginn/Ende mit berechneter Dauer, Durchgeführt von, Begleitperson, Monatspunkte 2.2 und offene Mängel des letzten Rundgangs.
+- **Kapitel 2 Checkliste**: R1-R15 in fünf Räumen (75 Felder); optional M1-M9, wenn 2.2 geprüft wird. Grundlagen stehen unter jedem Punkt; „Rest OK“ beschleunigt die Prüfung.
+- **Kapitel 3 Mängel und Massnahmen**: Mangel-ID JJJJ-MM-TT-Mnn, Punkt/Bereich, Beschreibung, Gefahr, Sofortmassnahme, Massnahme, Priorität, Frist und Kamerafotos.
+- **Kapitel 4 Abschluss**: vier Gesamtbewertungen sowie Unterschrift der durchführenden Person und optionale Kenntnisnahme. Formulardaten sind nach Abschluss schreibgeschützt.
+- **Register als Excel-Ersatz**: Übersicht, Rundgänge, Mängel mit vier Statuswerten und Prüftermine mit 15 Startvorschlägen. Einstellungen übernehmen Richtfristen 0/2/7/30 Tage und Höchstintervall 14 Tage aus dem Excel-Blatt „Listen“.
+- **Exporte**: PDF nach aktueller DOTX-Vorlage, XLSX mit Rundgänge/Mängel/Prüftermine und JSON-Backup Formatversion 4.
 - **Offline-fähig** (PWA, auf dem Startbildschirm installierbar). Daten liegen lokal im Browser (IndexedDB);
   Sicherung und Übertragung auf ein anderes Gerät per JSON-Datei unter "Sicherung".
 
@@ -42,7 +35,7 @@ Weitere Befehle:
 
 ```bash
 npm run typecheck    # TypeScript prüfen
-npm test             # Unit-Tests (Vitest): KW, Prio -> Frist, Zähler, Ergebnis, Validierung, Checkliste, Sicherung
+npm test             # Unit-Tests: R/M-Checkliste, Registerformeln, Fristen, Prüftermine, Nummern, PDF, XLSX, Backup
 npm run build        # Produktions-Build nach dist/
 npm run preview      # Build lokal ansehen
 npm run test:e2e     # Playwright-Smoke-Test (mobiler Viewport), erzeugt docs/screenshots/
@@ -81,13 +74,13 @@ Die App wird nicht in Odoo eingebettet, sondern als Link geöffnet (Daten bleibe
 
 Ein `iframe` ist nicht empfohlen: Kamera-Zugriff und Downloads sind in eingebetteten Frames je nach Browser eingeschränkt.
 
-## SOP-Änderungen
+## SOP- und Registerdaten
 
-Die gesamte Checkliste steht in **`src/data/checklist.ts`** (Bereiche, Punkte W/M, Grundlagen je Kontrollpunkt, Formulartexte, Kopfdaten `SOP_META`).
+Die Formularinhalte stehen in **`src/data/checklist.ts`** (fünf Formbereiche, Punkte R/M, Grundlagen, Formulartexte und Kopfdaten `SOP_META`). Workbook-Listen, Richtfristen, Status-/Ergebnisbeschriftungen und Prüfterminvorschläge stehen separat in **`src/data/register.ts`**.
 Bei einer neuen SOP-Version:
 
 1. `SOP_META.version` und `validFrom` anpassen, Punkte ändern (bestehende IDs nicht umnummerieren).
-2. `npm test` ausführen (der Test prüft u. a. 16 × 6 + 9 Punkte und dass jeder Punkt genau einer Grundlage zugeordnet ist).
+2. `npm test` ausführen (der Test prüft 15 × 5 + 9 Punkte sowie die Grundlagen je Kontrollpunkt).
 3. Spezifikation unter `specs/001-hse-rundgang/` nachführen.
 
 Jeder Rundgang speichert die SOP-Version, mit der er erstellt wurde. Änderungen der App: siehe `CHANGELOG.md`.
@@ -95,7 +88,8 @@ Jeder Rundgang speichert die SOP-Version, mit der er erstellt wurde. Änderungen
 ## Projektaufbau
 
 ```text
-src/data/checklist.ts   SOP-Definition (einzige Quelle)
+src/data/checklist.ts   DOTX-Formular und Checkliste
+src/data/register.ts    Excel-Registerlisten, Voreinstellungen und Vorschläge
 src/lib/                Fachlogik ohne UI: dates, walk, image, pdf, backup
 src/db.ts               IndexedDB (Dexie)
 src/components/, pages/ Oberfläche (React, Tailwind)

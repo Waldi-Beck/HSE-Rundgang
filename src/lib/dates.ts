@@ -1,68 +1,94 @@
-/** Datumshilfen. Alle Daten als lokale Kalendertage im Format YYYY-MM-DD. */
-
+/** Date/time helpers. Calendar dates are local YYYY-MM-DD strings. */
 const pad = (n: number) => String(n).padStart(2, '0');
 
-export function toISODate(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+export function toISODate(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-export function toTime(d: Date): string {
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+export function toTime(date: Date): string {
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-/** Parst YYYY-MM-DD als lokales Datum (Mittag, um DST-Effekte zu vermeiden). */
-export function parseISODate(s: string): Date {
-  const [y, m, d] = s.split('-').map(Number);
-  return new Date(y, (m || 1) - 1, d || 1, 12, 0, 0);
+export function parseISODate(value: string): Date {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, 12, 0, 0);
 }
 
-/** ISO-8601-Kalenderwoche: Woche mit dem ersten Donnerstag des Jahres ist KW 1. */
+/** ISO 8601 week number using the Thursday rule. */
 export function isoWeek(dateStr: string): { year: number; week: number } {
-  const d = parseISODate(dateStr);
-  const day = (d.getDay() + 6) % 7; // Mo=0 .. So=6
-  const thursday = new Date(d);
-  thursday.setDate(d.getDate() - day + 3);
+  const date = parseISODate(dateStr);
+  const day = (date.getDay() + 6) % 7;
+  const thursday = new Date(date);
+  thursday.setDate(date.getDate() - day + 3);
   const year = thursday.getFullYear();
   const firstThursday = new Date(year, 0, 4, 12);
-  const firstDay = (firstThursday.getDay() + 6) % 7;
-  firstThursday.setDate(firstThursday.getDate() - firstDay + 3);
-  const week = 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 864e5));
-  return { year, week };
-}
-
-export function addDays(dateStr: string, days: number): string {
-  const d = parseISODate(dateStr);
-  d.setDate(d.getDate() + days);
-  return toISODate(d);
-}
-
-/** Addiert Monate; am Monatsende wird auf den letzten Tag begrenzt (31.01. + 1 = 28./29.02.). */
-export function addMonths(dateStr: string, months: number): string {
-  const d = parseISODate(dateStr);
-  const day = d.getDate();
-  d.setDate(1);
-  d.setMonth(d.getMonth() + months);
-  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  d.setDate(Math.min(day, last));
-  return toISODate(d);
-}
-
-/** 2026-10-06 -> 06.10.2026 */
-export function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '';
-  const [y, m, d] = dateStr.slice(0, 10).split('-');
-  return `${d}.${m}.${y}`;
+  firstThursday.setDate(firstThursday.getDate() - ((firstThursday.getDay() + 6) % 7) + 3);
+  return { year, week: 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 864e5)) };
 }
 
 export function weekLabel(year: number, week: number): string {
   return `${year}-KW${pad(week)}`;
 }
 
-/** Dateiname gemäss SOP 5: HSE-Rundgang_JJJJ-KWxx (bei mehreren Rundgängen pro KW: _2, _3 ...). */
-export function reportBaseName(year: number, week: number, indexInWeek = 1): string {
-  return `HSE-Rundgang_${weekLabel(year, week)}${indexInWeek > 1 ? `_${indexInWeek}` : ''}`;
+export function formatDate(date: string | null | undefined): string {
+  if (!date) return '';
+  const [year, month, day] = date.slice(0, 10).split('-');
+  return `${day}.${month}.${year}`;
 }
 
-export function isOverdue(due: string, today: string): boolean {
+export function addDays(date: string, days: number): string {
+  const next = parseISODate(date);
+  next.setDate(next.getDate() + days);
+  return toISODate(next);
+}
+
+/** Calendar-month addition, clamped to the last day in the target month. */
+export function addMonths(date: string, months: number): string {
+  const next = parseISODate(date);
+  const day = next.getDate();
+  next.setDate(1);
+  next.setMonth(next.getMonth() + months);
+  next.setDate(Math.min(day, new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()));
+  return toISODate(next);
+}
+
+export function minutesOfDay(time: string): number | null {
+  const match = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  return hour < 24 && minute < 60 ? hour * 60 + minute : null;
+}
+
+export function durationMinutes(start: string, end: string): number | null {
+  const from = minutesOfDay(start);
+  const to = minutesOfDay(end);
+  if (from === null || to === null) return null;
+  return (to - from + 1440) % 1440;
+}
+
+export function formatDuration(minutes: number | null): string {
+  if (minutes === null) return '';
+  return `${Math.floor(minutes / 60)}:${pad(minutes % 60)}`;
+}
+
+export function formatWalkNumber(year: number, sequence: number): string {
+  return `HSE-RG-${year}-${String(sequence).padStart(3, '0')}`;
+}
+
+export function parseWalkNumber(docNr: string): { year: number; sequence: number } | null {
+  const match = /^HSE-RG-(\d{4})-(\d{3,})$/.exec(docNr);
+  return match ? { year: Number(match[1]), sequence: Number(match[2]) } : null;
+}
+
+export function createMangelId(date: string, formNumber: number): string {
+  return `${date.slice(0, 10)}-M${String(formNumber).padStart(2, '0')}`;
+}
+
+export function reportBaseName(date: string, docNr: string): string {
+  return `HSE-Rundgang_${date.slice(0, 10)}_${docNr}`;
+}
+
+export function isOverdue(due: string | null | undefined, today = toISODate(new Date())): boolean {
   return !!due && due < today;
 }

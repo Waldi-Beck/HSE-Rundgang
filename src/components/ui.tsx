@@ -1,5 +1,5 @@
-import { NavLink } from 'react-router';
-import { ClipboardText, Database, House, WarningDiamond } from '@phosphor-icons/react';
+import { Link, NavLink } from 'react-router';
+import { ClipboardText, Database, GearSix, House, Table } from '@phosphor-icons/react';
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import { SOP_META } from '../data/checklist';
 import { formatDate } from '../lib/dates';
@@ -13,13 +13,18 @@ export function BrandHeader() {
             QPS
           </span>
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-[15px] font-semibold">HSE-Rundgang</div>
+            <div className="truncate text-[15px] font-semibold">{SOP_META.title}</div>
             <div className="truncate text-xs text-muted">{SOP_META.docId}</div>
           </div>
         </div>
-        <div className="text-right text-xs leading-tight text-muted">
-          <div>Version {SOP_META.version}</div>
-          <div>Gültig ab {formatDate(SOP_META.validFrom)}</div>
+        <div className="flex items-center gap-2">
+          <div className="text-right text-xs leading-tight text-muted">
+            <div>Version {SOP_META.version}</div>
+            <div>Gültig ab {formatDate(SOP_META.validFrom)}</div>
+          </div>
+          <Link to="/einstellungen" aria-label="Einstellungen" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2">
+            <GearSix size={20} aria-hidden />
+          </Link>
         </div>
       </div>
     </header>
@@ -28,7 +33,7 @@ export function BrandHeader() {
 
 const navItems = [
   { to: '/', label: 'Übersicht', icon: House, end: true },
-  { to: '/maengel', label: 'Mängel', icon: WarningDiamond, end: false },
+  { to: '/register', label: 'Register', icon: Table, end: false },
   { to: '/sicherung', label: 'Sicherung', icon: Database, end: false },
 ];
 

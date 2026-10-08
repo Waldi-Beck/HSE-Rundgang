@@ -1,91 +1,56 @@
-# Implementation Plan: HSE-Rundgang App (SOP QPS_HSE_00064)
+# Implementation Plan: HSE Rundgang und Register
 
-**Branch**: `001-hse-rundgang` | **Date**: 2026-10-06 | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-hse-rundgang` | **Revision**: 2026-10-08 | **Specification**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/001-hse-rundgang/spec.md`
+## Design Read
+
+Reading this as: mobile-first, regulated workplace-inspection product for staff in a workshop, with a calm, accessible and reliable interface, preserving the established QPS green/neutral language. Design values: variance 3, motion 2, density 5. Apply Taste-Skill general rules only; it explicitly excludes dashboards and multistep forms.
 
 ## Summary
 
-Mobile-first, offline-fähige Single-Page-App, die die SOP QPS_HSE_00064 abbildet: Rundgang anlegen
-(KW, Wochen/Monats-Vorschlag), Checkliste Raum für Raum (Punkt × Bereich) bewerten, Mängel mit Kamera-Fotos erfassen,
-mit Bildschirm-Unterschrift abschliessen, PDF-Bericht `HSE-Rundgang_JJJJ-KWxx.pdf` erzeugen,
-offene Mängel über Rundgänge verfolgen. Rein statisches Frontend mit Datenhaltung in IndexedDB;
-Auslieferung über GitHub Pages oder einen beliebigen Webserver, verlinkt aus Odoo.
+Replace the older 16x6 W matrix and simple defect register with the current Word template (R1-R15 in five areas plus optional M1-M9) and a local register equivalent to the workbook. Keep data offline in IndexedDB, retain annual immutable round numbers, add follow-up lifecycle and device inspection dates, and export XLSX/JSON/PDF client-side.
 
 ## Technical Context
 
-**Language/Version**: TypeScript 5.x, Node 22 (Build)
+- React 19, Vite 8, TypeScript 7, Tailwind 4, React Router 8.
+- Dexie 4/IndexedDB with a new schema version after v3.
+- jsPDF + jspdf-autotable for PDF.
+- ExcelJS for workbook generation; lazy-load for export only.
+- Vitest plus Playwright using the already installed Chromium/Edge executable; do not run browser installation.
+- Offline-first PWA; photos JPEG Blob <= 1600 px long edge.
 
-**Primary Dependencies**: React 19, Vite 7, Tailwind CSS 4, React Router (HashRouter), Dexie 4 (IndexedDB), jsPDF + jspdf-autotable (PDF), vite-plugin-pwa (Service Worker/Manifest), @phosphor-icons/react, @fontsource-variable/geist
+## Source Decisions
 
-**Storage**: IndexedDB im Browser (Tabellen `walks`, `defects`, `photos`); Fotos als JPEG-Blob
+1. Current form text/layout source is `QPS_HSE_00064_HSE_Rundgang_V1.0_Vorlage.dotx`; existing DOCX is old and is not modified.
+2. Excel formula semantics and seed rows are captured from `HSE_Rundgang_Register.xlsx` sheets Übersicht, Rundgänge, Mängel, Prüftermine, Grundlagen, Listen. The source files remain read-only.
+3. SOP_META document ID, version, and valid-from remain fixed; title becomes exactly `HSE Rundgang`.
+4. Preserve current annual walk counter and docNr identity. New database upgrade may reset incompatible old rating data only when no safe mapping exists; it must not reset counters or crash.
 
-**Testing**: Vitest (Fachlogik), Playwright (Smoke-Test, Chromium, mobile Viewport)
+## Architecture
 
-**Target Platform**: Aktuelle Mobile-Browser (Safari iOS 16+, Chrome Android), Desktop-Browser
+- `src/data/checklist.ts`: single versioned data definition for five inspection areas, R1-R15, M1-M9, legal bases and literal form copy.
+- `src/data/register.ts`: Excel seed lists, priority days, initial inspection proposals and result/status values.
+- `src/lib/walk.ts`, `dates.ts`, `register.ts`: pure rating, duration, interval, deadline, ID and dashboard calculations.
+- `src/db.ts`: versioned schema, migrations, seed data, repository transactions.
+- Existing WalkPage becomes the form flow: Rundgangdaten, room-by-room checklist, defects, close.
+- RegisterPage has Rundgänge, Mängel, Prüftermine; DashboardPage becomes workbook Übersicht; SettingsPage edits Listen values.
+- `src/lib/pdf.ts`: two-page-first PDF with continuation for many defects/photos, matching the new template and exact current SOP metadata.
+- `src/lib/excel.ts`: XLSX builder with the 3 register sheets and workbook column order.
+- `src/lib/backup.ts`: JSON backup version 4, collision-safe import including inspections/settings.
 
-**Project Type**: Web-Frontend (statische PWA)
+## Delivery Stages
 
-**Performance Goals**: Erste Anzeige < 2 s im Firmen-WLAN; Bewertung eines Punkts ohne spürbare Verzögerung (< 100 ms)
+1. Rewrite specification/data model/plan/tasks before feature code.
+2. Replace checklist and types, pure calculations, and Dexie migration/seeding. Run typecheck/unit tests.
+3. Rebuild walk flow, defects follow-up, overview/register/settings pages. Run typecheck/unit tests.
+4. Build PDF/XLSX/JSON exports and output-generation tests. Run unit tests/build.
+5. Add full Playwright path; run with installed browser, no install command.
+6. Generate example PDF/XLSX, render every PDF page for visual inspection, update README/CHANGELOG/screenshots, run all requested checks, attempt local commit without push.
 
-**Constraints**: Offline-fähig, kein Backend, Foto max. 1600 px / ca. 600 KB, Touch-Ziele >= 44 px, UI Deutsch (CH)
+## Risks and Mitigations
 
-**Scale/Scope**: 1 bis 3 Anwender, ca. 50 Rundgänge/Jahr, einige hundert Fotos/Jahr; 4 Hauptansichten
-
-## Constitution Check
-
-| Prinzip | Umsetzung im Plan | Status |
-|---|---|---|
-| I SOP-Treue | Checkliste in `src/data/checklist.ts` mit `SOP_META.version`; FR-Verweise auf SOP-Kapitel; Rundgang speichert `sopVersion` | OK |
-| II Offline zuerst | PWA mit Precache, IndexedDB, PDF clientseitig | OK |
-| III Datenintegrität | Abschluss-Validierung als reine Funktion; abgeschlossene Rundgänge schreibgeschützt; Mangel-Status separat änderbar | OK |
-| IV Mobile zuerst / Deutsch CH | Mobile Layout, 44 px Ziele, `capture="environment"`, Taste-Skill-Regeln (Dials 3/2/5) | OK |
-| V Einfachheit | Ein Vite-Projekt, keine Server-Komponente, kein State-Management-Framework (Dexie `useLiveQuery`) | OK |
-| VI Testbare Logik | `src/lib/*.ts` rein funktional, Vitest; Playwright-Smoke | OK |
-
-Re-Check nach Phase 1: keine Verletzungen, keine Complexity-Tracking-Einträge.
-
-## Project Structure
-
-### Documentation (this feature)
-
-```text
-specs/001-hse-rundgang/
-├── plan.md
-├── research.md
-├── data-model.md
-├── quickstart.md
-├── contracts/
-│   └── backup-format.md
-├── checklists/requirements.md
-└── tasks.md
-```
-
-### Source Code (repository root)
-
-```text
-src/
-├── data/checklist.ts        # SOP-Definition (einzige Quelle), SOP_META
-├── lib/                     # reine Fachlogik (getestet)
-│   ├── dates.ts             # ISO-KW, Datumsformat, Dateiname
-│   ├── walk.ts              # Felder je Art und Bereich, Zähler, Ergebnis, Validierung, Prio->Frist
-│   ├── image.ts             # Foto verkleinern (Canvas)
-│   ├── pdf.ts               # PDF-Bericht (jsPDF)
-│   ├── backup.ts            # JSON Export/Import, CSV-Register
-│   └── types.ts
-├── db.ts                    # Dexie-Schema + Repository-Funktionen
-├── components/              # UI-Bausteine (Header, SegmentedRating, PhotoInput, SignaturePad, ...)
-├── pages/                   # Dashboard, WalkPage (Tabs), DefectRegister, Backup
-├── App.tsx, main.tsx, index.css
-tests/
-├── unit/                    # Vitest
-└── e2e/                     # Playwright smoke
-public/                      # Icons, Test-Fixture nicht hier (tests/fixtures)
-.github/workflows/pages.yml  # Deployment GitHub Pages
-```
-
-**Structure Decision**: Einzelnes Frontend-Projekt (Option 1 angepasst), Fachlogik getrennt von UI unter `src/lib`.
-
-## Complexity Tracking
-
-Keine Verletzungen.
+- Old DOCX conflicts with the new form: explicitly treat DOTX as current and never alter either source.
+- Excel dates are serial values: use ExcelJS date values and formula results consistently; test boundary conditions.
+- Multiple Rundgänge on one date can yield repeated formula-style Mangel IDs; keep UUID as internal key and display the specified Mangel-ID format.
+- Rechecks can change a due date: centralize the precedence rule and test it.
+- Local browser storage may be cleared: keep JSON backup complete and collision-safe.

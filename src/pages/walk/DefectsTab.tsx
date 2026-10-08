@@ -5,7 +5,7 @@ import type { Defect, Walk } from '../../lib/types';
 import { DefectRow } from '../../components/DefectRow';
 import { EmptyState } from '../../components/ui';
 
-/** Kapitel 4 Mängel und Massnahmen des Rundgangs (FR-030 bis FR-034). */
+/** Kapitel 3 Mängel und Massnahmen aus dem aktuellen Formular. */
 export function DefectsTab({
   walk,
   defects,
@@ -14,7 +14,7 @@ export function DefectsTab({
 }: {
   walk: Walk;
   defects: Defect[];
-  onNewDefect: (itemId?: string) => void;
+  onNewDefect: (itemId?: string, area?: string) => void;
   onEditDefect: (d: Defect) => void;
 }) {
   const ro = walk.status === 'closed';
@@ -27,8 +27,8 @@ export function DefectsTab({
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">4. Mängel und Massnahmen</h2>
-          <p className="text-sm text-muted">Je Mangel Punkt und Bereich. Prio: K sofort, H 48 Std., M 1 Woche, N 1 Monat (Richtwerte)</p>
+          <h2 className="text-lg font-semibold">3. Mängel und Massnahmen</h2>
+          <p className="text-sm text-muted">Mangel-ID, Kontrollpunkt, Bereich, Gefahr, Massnahmen und Foto.</p>
         </div>
         {!ro && (
           <button type="button" className="btn-secondary shrink-0" onClick={() => onNewDefect()}>
@@ -38,7 +38,7 @@ export function DefectsTab({
       </div>
       {defects.length === 0 ? (
         <EmptyState title="Keine Mängel erfasst">
-          Einen Punkt in der Checkliste auf "Mangel" setzen, dann öffnet sich das Mängel-Formular mit Punkt, Bereich und Foto.
+          Einen Punkt in der Checkliste auf „Mangel“ setzen, dann öffnet sich die Mängelerfassung mit Punkt und Bereich.
         </EmptyState>
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">

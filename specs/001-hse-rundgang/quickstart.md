@@ -1,21 +1,23 @@
-# Quickstart: HSE-Rundgang App
+# Quickstart: HSE Rundgang
 
-```bash
+```powershell
 npm install
-npm run dev          # http://localhost:5173
+npm run dev
 npm run typecheck
-npm test             # Vitest (Fachlogik)
-npm run build        # dist/
-npm run test:e2e     # Playwright Smoke (baut und startet preview)
+npm test
+npm run test:e2e
+npm run build
 ```
 
-## Validierungsszenario (entspricht den Akzeptanzkriterien US1 bis US3)
+## Acceptance walk-through
 
-1. Startseite: "Neuer Rundgang". Datum/KW/Uhrzeit vorbelegt, Art vorgeschlagen.
-2. Name "Durchgeführt von" eintragen, "Weiter zur Checkliste".
-3. Bereich QLabs wählen, W4 "Mangel" antippen: Mängel-Formular öffnet sich mit Pkt. W4 und Bereich QLabs.
-4. Mangel beschreiben, Prio H: Frist = Datum + 2 Tage. Foto aufnehmen. Speichern.
-5. Restliche Punkte bewerten ("Restliche Punkte auf OK setzen" je Bereich beschleunigt).
-6. Tab "Abschluss": Zähler prüfen, Ergebnis-Vorschlag "Offene Massnahmen", unterschreiben, abschliessen.
-7. "PDF" exportieren: Datei `HSE-Rundgang_2026-KW41.pdf`.
-8. Neuer Rundgang: Mangel aus Schritt 4 unter "Offene Punkte Vorwoche".
+1. Overview shows last round, next due date, monthly-check state, defect totals and inspection alerts.
+2. Create a walk. Date, beginning time and monthly 2.2 suggestion are prefilled; enter end time and placeholder name `Max Muster`.
+3. In 2.1 choose QLabs and mark R4 as Mangel. Defect editor is prefilled with QLabs/R4.
+4. Add description, hazard, immediate action, action, priority, responsible person and a camera fixture photo; save.
+5. Use Rest OK in each of the five rooms. If 2.2 is checked, assess M1-M9 too.
+6. Choose a result, draw signature and close. Incomplete fields must block closure.
+7. Download PDF with date and immutable walk number; inspect every page.
+8. Export XLSX and verify `Rundgänge`, `Mängel`, `Prüftermine` and their register columns.
+9. Create a second walk. Verify previous open defect appears and overview/register counts match.
+10. Mark a test defect `Nachkontrolle erforderlich`, enter a new date, and verify that it becomes the effective due date.

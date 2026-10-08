@@ -1,8 +1,10 @@
-# Specification Quality Checklist: HSE-Rundgang App
+# Specification Quality Checklist: HSE Rundgang App and Register
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-10-06
 **Feature**: [spec.md](../spec.md)
+
+**Source authority**: The provided DOTX is the current form and the XLSX is the register source. The checked-in DOCX has older W1-W16 content and is retained unchanged.
 
 ## Content Quality
 
@@ -31,5 +33,6 @@
 
 ## Notes
 
-- Iteration 1: JPEG/1600 px (FR-033) and CSV/JSON (FR-042, FR-052) are format requirements from the brief and the existing Excel workflow, not implementation choices; accepted.
-- Open decisions were resolved as documented assumptions (result rule FR-022, "first walk of month", signature not ZertES-qualified) instead of clarification markers.
+- Previous revision's 16x6 checklist and CSV-only register are superseded by the current DOTX's R1-R15 x five areas and the Excel workbook's three register sheets.
+- Excel formula behavior is restated as testable requirements for due-date precedence, status, overdue, round interval and monthly warnings.
+- Current change keeps document ID/version fixed while changing only the display title to `HSE Rundgang`.

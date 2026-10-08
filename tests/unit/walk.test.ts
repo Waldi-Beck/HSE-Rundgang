@@ -1,167 +1,82 @@
 import { describe, expect, it } from 'vitest';
+import { FORM_AREAS } from '../../src/data/checklist';
+import { DEFAULT_REGISTER_SETTINGS } from '../../src/data/register';
 import type { Defect, Walk } from '../../src/lib/types';
-import {
-  areasForItem,
-  cellKey,
-  countRatings,
-  defectCounts,
-  defectsForCell,
-  dueFromPrio,
-  hiddenRatingsOnWeekly,
-  mangelWithoutDefect,
-  nextDefectNr,
-  openPointLabel,
-  parseCellKey,
-  ratableKeys,
-  suggestResult,
-  suggestType,
-  validateForClose,
-  weeklyKeys,
-} from '../../src/lib/walk';
+import { deriveInspection, defectDaysOpen, roundRegisterRows, suggestedResult, validDefectDue } from '../../src/lib/register';
+import { addDays } from '../../src/lib/dates';
+import { countRatings, defectAreaValid, firstWalkOfMonth, mangelWithoutDefect, newMangelId, requiredRatingKeys, validateForClose } from '../../src/lib/walk';
 
-function walk(partial: Partial<Walk> = {}): Walk {
+function makeWalk(patch: Partial<Walk> = {}): Walk {
   return {
-    id: 'w1', date: '2026-10-06', isoYear: 2026, week: 41, time: '09:00', inspector: 'Waldemar Becker',
-    companion: '', type: 'weekly', openPointsNote: '', openPointsSnapshot: null, ratings: {}, result: null,
-    signature: { name: '', date: '', image: '' }, acknowledgement: { name: '', date: '', image: '' },
-    status: 'draft', sopVersion: '1.0', createdAt: '', updatedAt: '', closedAt: null, ...partial,
-  };
-}
-function defect(partial: Partial<Defect> = {}): Defect {
-  return {
-    id: 'd1', walkId: 'w1', nr: 1, itemId: 'W4', area: 'qlabs', hazard: 'Feuerlöscher mit Karton verstellt', action: '',
-    responsible: '', prio: 'H', due: '2026-10-08', status: 'open', doneAt: null, doneNote: '',
-    createdAt: '', updatedAt: '', ...partial,
+    id: 'round-1', docNr: 'HSE-RG-2026-001', date: '2026-10-08', isoYear: 2026, week: 41,
+    startTime: '08:00', endTime: '08:30', inspector: 'Max Muster', companion: '', monthlyChecked: false,
+    ratings: {}, monthlyAreas: {}, openDefectSnapshot: null, result: null, note: '',
+    signature: { name: 'Max Muster', date: '2026-10-08', image: 'data:image/png;base64,test' },
+    acknowledgement: { name: '', date: '', image: '' }, status: 'draft', sopVersion: '1.0',
+    createdAt: '2026-10-08T08:00:00.000Z', updatedAt: '', closedAt: null, ...patch,
   };
 }
 
-describe('Bewertungsschlüssel', () => {
-  it('Wochenpunkt je Bereich, Monatspunkt ohne Bereich', () => {
-    expect(cellKey('W4', 'qlabs')).toBe('W4@qlabs');
-    expect(cellKey('M1')).toBe('M1');
-    expect(parseCellKey('W4@xtec-lager')).toEqual({ itemId: 'W4', area: 'xtec-lager' });
-    expect(parseCellKey('M2')).toEqual({ itemId: 'M2', area: '' });
+function makeDefect(patch: Partial<Defect> = {}): Defect {
+  return {
+    id: 'defect-1', walkId: 'round-1', nr: 1, mangelId: '2026-10-08-M01', itemId: 'R4', area: 'qlabs',
+    description: 'Feuerlöscher verstellt', hazard: 'Zugriff behindert', immediateAction: 'Zugang freigeräumt', action: 'Markierung erneuern',
+    responsible: 'Max Muster', priority: 'H', due: '2026-10-10', status: 'open', doneAt: null, recheckAt: null,
+    controlledBy: '', fixed: null, newDue: '', note: '', createdAt: '2026-10-08T08:00:00.000Z', updatedAt: '', ...patch,
+  };
+}
+
+describe('New checklist and closure', () => {
+  it('requires exactly 75 weekly ratings and adds nine only when 2.2 is checked', () => {
+    expect(requiredRatingKeys(false)).toHaveLength(75);
+    expect(requiredRatingKeys(true)).toHaveLength(84);
+    expect(requiredRatingKeys(false).every((key) => /^R\d+@/.test(key))).toBe(true);
   });
-  it('Woche = 96 Zellen, Monat = 96 + 9', () => {
-    expect(ratableKeys('weekly')).toHaveLength(96);
-    expect(new Set(ratableKeys('weekly')).size).toBe(96);
-    expect(ratableKeys('monthly')).toHaveLength(105);
-    expect(ratableKeys('monthly')).toContain('M9');
-    expect(ratableKeys('weekly')).not.toContain('M1');
-    expect(weeklyKeys('qlabs')).toHaveLength(16);
-    expect(weeklyKeys('qlabs')[3]).toBe('W4@qlabs');
+
+  it('counts required ratings and verifies area-linked defects', () => {
+    const walk = makeWalk({ ratings: { 'R1@engineering': 'ok', 'R4@qlabs': 'mangel', M1: 'na' }, monthlyChecked: false });
+    expect(countRatings(walk)).toMatchObject({ total: 75, checked: 2, ok: 1, mangel: 1, na: 0 });
+    expect(mangelWithoutDefect(walk, [makeDefect()])).toEqual([]);
+    expect(mangelWithoutDefect(walk, [])).toEqual(['R4@qlabs']);
+    expect(defectAreaValid(makeDefect())).toBe(true);
+    expect(defectAreaValid(makeDefect({ itemId: 'R4', area: 'Büro / Verwaltung' }))).toBe(false);
   });
-  it('Bereiche für Mängel: Wochenpunkt 6, Monatspunkt 6 + allgemein', () => {
-    expect(areasForItem('W4').map((a) => a.id)).not.toContain('alle');
-    expect(areasForItem('W4')).toHaveLength(6);
-    expect(areasForItem('M1')).toHaveLength(7);
-    expect(areasForItem('M1').at(-1)).toEqual({ id: 'alle', label: 'Alle Bereiche / allgemein' });
+
+  it('validates that monthly ratings have an area when 2.2 is active', () => {
+    const all = Object.fromEntries(requiredRatingKeys(true).map((key) => [key, 'ok' as const]));
+    const errors = validateForClose(makeWalk({ monthlyChecked: true, ratings: all }), []);
+    expect(errors.join(' ')).toContain('Bereich fehlt für Monatspunkte');
+    const monthlyAreas = Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`M${i + 1}`, FORM_AREAS[0].id]));
+    expect(validateForClose(makeWalk({ monthlyChecked: true, ratings: all, monthlyAreas, result: 'none' }), [])).toEqual([]);
   });
 });
 
-describe('Zähler', () => {
-  it('Fortschritt zählt nur Zellen des Rundgangs', () => {
-    const c = countRatings(walk({ ratings: { 'W1@qlabs': 'ok', 'W2@qlabs': 'mangel', 'W3@gaenge': 'na', M1: 'ok' } }));
-    expect(c).toEqual({ total: 96, checked: 3, ok: 1, mangel: 1, na: 1 });
+describe('Workbook deadline and inspection calculations', () => {
+  it('uses new recheck date before explicit date before priority guidance', () => {
+    const defect = makeDefect();
+    expect(validDefectDue('2026-10-08', defect, DEFAULT_REGISTER_SETTINGS)).toBe('2026-10-10');
+    expect(validDefectDue('2026-10-08', { ...defect, due: '' }, DEFAULT_REGISTER_SETTINGS)).toBe('2026-10-10');
+    expect(validDefectDue('2026-10-08', { ...defect, due: '', newDue: '2026-10-20' }, DEFAULT_REGISTER_SETTINGS)).toBe('2026-10-20');
+    expect(addDays('2026-10-08', DEFAULT_REGISTER_SETTINGS.priorityDays.K)).toBe('2026-10-08');
+    expect(addDays('2026-10-08', DEFAULT_REGISTER_SETTINGS.priorityDays.H)).toBe('2026-10-10');
   });
-  it('Monat zählt 2.2 mit', () => {
-    const c = countRatings(walk({ type: 'monthly', ratings: { 'W1@qlabs': 'ok', M1: 'ok' } }));
-    expect(c.checked).toBe(2);
-    expect(c.total).toBe(105);
-  });
-  it('je Bereich', () => {
-    const w = walk({ ratings: { 'W1@qlabs': 'ok', 'W1@engineering': 'ok' } });
-    expect(countRatings(w, weeklyKeys('qlabs'))).toMatchObject({ total: 16, checked: 1 });
-  });
-  it('SOP 3: Anzahl Mängel und davon kritisch (K)', () => {
-    expect(defectCounts([])).toEqual({ total: 0, critical: 0 });
-    expect(defectCounts([{ prio: 'K' }, { prio: 'H' }, { prio: 'K' }])).toEqual({ total: 3, critical: 2 });
-  });
-  it('Wechsel auf Woche blendet nur 2.2 aus', () => {
-    expect(hiddenRatingsOnWeekly(walk({ ratings: { 'W1@qlabs': 'ok', M1: 'ok', M2: 'na' } }))).toEqual(['M1', 'M2']);
-  });
-});
 
-describe('Prio -> Frist (SOP 4)', () => {
-  it.each([
-    ['K', '2026-10-06'],
-    ['H', '2026-10-08'],
-    ['M', '2026-10-13'],
-    ['N', '2026-11-06'],
-  ] as const)('%s -> %s', (prio, due) => expect(dueFromPrio('2026-10-06', prio)).toBe(due));
-});
+  it('calculates inspection status for missing dates/intervals, overdue, due soon and ok', () => {
+    const base = { id: 'i1', description: 'Test', area: 'QLabs', intervalMonths: 12, lastInspection: '', responsible: '', evidence: '', note: '', createdAt: '', updatedAt: '' };
+    expect(deriveInspection(base, '2026-10-08').status).toBe('Datum fehlt');
+    expect(deriveInspection({ ...base, lastInspection: '2025-01-01', intervalMonths: null }, '2026-10-08').status).toBe('Intervall fehlt');
+    expect(deriveInspection({ ...base, lastInspection: '2025-01-01' }, '2026-10-08').status).toBe('überfällig');
+    expect(deriveInspection({ ...base, lastInspection: '2025-10-20' }, '2026-10-08').status).toBe('bald fällig');
+    expect(deriveInspection({ ...base, lastInspection: '2026-01-01' }, '2026-10-08').status).toBe('ok');
+  });
 
-describe('Rundgangsart-Vorschlag', () => {
-  it('erster Rundgang im Monat -> Monat', () => expect(suggestType('2026-10-06', ['2026-09-29'])).toBe('monthly'));
-  it('weiterer Rundgang im Monat -> Woche', () =>
-    expect(suggestType('2026-10-13', ['2026-10-06', '2026-09-29'])).toBe('weekly'));
-});
-
-describe('Ergebnis-Vorschlag', () => {
-  it('keine Mängel', () => expect(suggestResult([])).toBe('none'));
-  it('K -> kritisch', () => expect(suggestResult([{ prio: 'N', status: 'open' }, { prio: 'K', status: 'done' }])).toBe('critical'));
-  it('offener H -> offene Massnahmen', () => expect(suggestResult([{ prio: 'H', status: 'open' }])).toBe('open'));
-  it('H erledigt / M / N -> geringfügig', () =>
-    expect(suggestResult([{ prio: 'H', status: 'done' }, { prio: 'M', status: 'open' }])).toBe('minor'));
-});
-
-describe('Mangel mit Bereich', () => {
-  it('Wochenzelle braucht Mangel mit gleichem Punkt UND Bereich', () => {
-    const w = walk({ ratings: { 'W4@qlabs': 'mangel' } });
-    expect(mangelWithoutDefect(w, [defect({ area: 'engineering' })])).toEqual(['W4@qlabs']);
-    expect(mangelWithoutDefect(w, [defect({ itemId: 'W5' })])).toEqual(['W4@qlabs']);
-    expect(mangelWithoutDefect(w, [defect()])).toEqual([]);
-    expect(defectsForCell('W4@qlabs', [defect(), defect({ id: 'd2', area: 'gaenge' })])).toHaveLength(1);
-  });
-  it('Monatspunkt: Mangel mit beliebigem Bereich genügt', () => {
-    const w = walk({ type: 'monthly', ratings: { M2: 'mangel' } });
-    expect(mangelWithoutDefect(w, [])).toEqual(['M2']);
-    expect(mangelWithoutDefect(w, [defect({ itemId: 'M2', area: 'alle' })])).toEqual([]);
-  });
-  it('Offene Punkte Vorwoche zeigen Punkt und Bereich', () => {
-    expect(openPointLabel({ defect: defect(), walk: walk() })).toBe(
-      '2026-KW41 Nr. 1 (W4 / QLabs): Feuerlöscher mit Karton verstellt, Frist 08.10.2026, Prio H',
-    );
-  });
-});
-
-describe('Abschluss-Validierung', () => {
-  const allOk = (type: Walk['type'] = 'weekly') => Object.fromEntries(ratableKeys(type).map((k) => [k, 'ok' as const]));
-  const signed = { name: 'Waldemar Becker', date: '2026-10-06', image: 'data:image/png;base64,x' };
-
-  it('vollständiger Wochenrundgang ist abschliessbar', () => {
-    expect(validateForClose(walk({ ratings: allOk(), result: 'none', signature: signed }), [])).toEqual([]);
-  });
-  it('Monatsrundgang verlangt zusätzlich 2.2', () => {
-    const errs = validateForClose(walk({ type: 'monthly', ratings: allOk(), result: 'none', signature: signed }), []);
-    expect(errs).toHaveLength(1);
-    expect(errs[0]).toMatch(/^9 Felder nicht bewertet: M1, M2/);
-  });
-  it('meldet unbewertete Felder, fehlende Unterschrift und Ergebnis', () => {
-    const errs = validateForClose(walk({ ratings: { 'W1@gaenge': 'ok' } }), []);
-    expect(errs.join(' ')).toMatch(/95 Felder nicht bewertet: W2 \/ Gänge \/ Treppen/);
-    expect(errs.join(' ')).toMatch(/und 87 weitere/);
-    expect(errs.join(' ')).toMatch(/Unterschrift/);
-    expect(errs.join(' ')).toMatch(/Gesamtergebnis/);
-  });
-  it('"Mangel" ohne Eintrag mit passendem Bereich verhindert Abschluss', () => {
-    const w = walk({ ratings: { ...allOk(), 'W4@qlabs': 'mangel' }, result: 'minor', signature: signed });
-    expect(validateForClose(w, [])).toEqual(['W4 / QLabs ist "Mangel", aber ohne Eintrag in Kapitel 4.']);
-    expect(validateForClose(w, [defect({ area: 'qmeasure' })])).toEqual(['W4 / QLabs ist "Mangel", aber ohne Eintrag in Kapitel 4.']);
-    expect(validateForClose(w, [defect()])).toEqual([]);
-  });
-  it('unvollständiger Mangel wird gemeldet (Bereich ist Pflicht)', () => {
-    const w = walk({ ratings: { ...allOk(), 'W4@qlabs': 'mangel' }, result: 'minor', signature: signed });
-    expect(validateForClose(w, [defect(), defect({ id: 'd2', nr: 2, area: '', hazard: ' ' })])).toEqual([
-      'Mangel Nr. 2: Bereich, Mangel/Gefahr fehlt.',
-    ]);
-  });
-  it('Wochenpunkt mit "Alle Bereiche / allgemein" ist ungültig', () => {
-    const w = walk({ ratings: allOk(), result: 'minor', signature: signed });
-    expect(validateForClose(w, [defect({ area: 'alle' })])).toEqual(['Mangel Nr. 1: Bereich passt nicht zu Pkt. W4.']);
-  });
-  it('nächste Mangel-Nr.', () => {
-    expect(nextDefectNr([])).toBe(1);
-    expect(nextDefectNr([{ nr: 1 }, { nr: 3 }])).toBe(4);
+  it('creates Mangel IDs, first-of-month recommendation and summary rows', () => {
+    expect(newMangelId('2026-10-08', 1)).toBe('2026-10-08-M01');
+    expect(firstWalkOfMonth('2026-10-08', ['2026-09-30'])).toBe(true);
+    expect(firstWalkOfMonth('2026-10-08', ['2026-10-07'])).toBe(false);
+    expect(suggestedResult([makeDefect({ priority: 'K' })])).toBe('critical');
+    expect(defectDaysOpen('2026-10-01', makeDefect(), '2026-10-08')).toBe(7);
+    const rows = roundRegisterRows([makeWalk()], [makeDefect()], DEFAULT_REGISTER_SETTINGS);
+    expect(rows[0]).toMatchObject({ defectCount: 1, criticalCount: 0, openCount: 1, pdfFilename: 'HSE-Rundgang_2026-10-08_HSE-RG-2026-001.pdf' });
   });
 });

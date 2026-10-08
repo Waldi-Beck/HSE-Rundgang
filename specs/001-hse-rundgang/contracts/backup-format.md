@@ -1,29 +1,42 @@
-# Contract: JSON-Sicherung und CSV-Register
+# Contracts: Backup and Excel Export
 
-## JSON-Sicherung (`hse-rundgang-backup_YYYY-MM-DD.json`)
+## JSON backup
+
+Filename: `hse-rundgang-backup_YYYY-MM-DD.json`.
 
 ```json
 {
   "format": "qps-hse-rundgang-backup",
-  "formatVersion": 2,
-  "exportedAt": "2026-10-06T14:03:00.000Z",
+  "formatVersion": 4,
+  "exportedAt": "2026-10-08T14:03:00.000Z",
   "sop": { "docId": "QPS_HSE_00064", "version": "1.0" },
-  "walks":   [ /* Walk, siehe data-model.md */ ],
-  "defects": [ /* Defect */ ],
-  "photos":  [ { "id": "…", "defectId": "…", "width": 1600, "height": 1200, "createdAt": "…", "dataUrl": "data:image/jpeg;base64,…" } ]
+  "walks": [],
+  "defects": [],
+  "photos": [],
+  "inspections": [],
+  "settings": []
 }
 ```
 
-Import-Regeln:
-- `format` muss `qps-hse-rundgang-backup` sein, sonst Abbruch mit Meldung.
-- `formatVersion` muss 2 sein. Version 1 (alte Checkliste A bis G) wird mit der Meldung "Diese Sicherung stammt aus der alten Checkliste (Rubriken A bis G) und kann nicht eingelesen werden. …" abgewiesen; neuere Versionen mit Hinweis auf ein App-Update.
-- Einträge werden per `id` eingefügt oder ersetzt (upsert); nichts wird gelöscht.
-- Ergebnis: Anzahl importierter Rundgänge, Mängel, Fotos.
+- Import rejects format versions 1-3 with a clear upgrade/re-export message and rejects future versions.
+- Import validates walks, monthly ratings, defect statuses and inspection settings.
+- Same-ID round upsert preserves local immutable `docNr`; a conflicting different ID is skipped with dependent defect/photo rows and reported.
+- All included photos are data URLs. Import result reports per-entity counts and conflicts.
 
-## CSV-Mängelregister (`HSE-Maengelregister_YYYY-MM-DD.csv`)
+## XLSX register export
 
-UTF-8 mit BOM, Trennzeichen `;`, Zeilenende CRLF. Spalten:
+Filename: `HSE-Rundgang_Register_YYYY-MM-DD.xlsx`; worksheets are named exactly `Rundgänge`, `Mängel`, `Prüftermine`.
 
-`Rundgang;Datum;Nr;Pkt;Bereich;Mangel/Gefahr;Massnahme;Verantwortlich;Prio;Frist;Status;Erledigt am;Vermerk`
+### Rundgänge columns (same order as source workbook A:Q)
 
-`Rundgang` = `2026-KW41`, `Bereich` = Klartext (z. B. `QLabs`, `Alle Bereiche / allgemein`), `Status` = `offen` | `erledigt`.
+`Nr.; Datum; KW; Tage seit letztem; Intervall; Monatspunkte 2.2 geprüft; Beginn; Ende; Dauer; Durchgeführt von; Begleitperson; Mängel erfasst; davon kritisch; davon noch offen; Gesamtbewertung; Ablage (PDF-Datei); Bemerkung`
+
+### Mängel columns (same order as source workbook A:W)
+
+`Mangel-ID; Datum; KW; Nr. im Formular; Bereich; Kontrollpunkt; Beschreibung des Mangels; Festgestellte Gefahr; Priorität; Sofortmassnahme; Massnahme; Verantwortlich; Frist; Status; Erledigt am; Nachkontrolle am; Kontrolliert von; Mangel behoben?; Neuer Termin (bei Nein); Gültige Frist; Tage offen; Überfällig; Bemerkung`
+
+### Prüftermine columns (same order as source workbook A:J)
+
+`Nr.; Prüfung; Bereich; Intervall (Monate); Letzte Prüfung; Nächste Fälligkeit; Status; Verantwortlich; Nachweis / Ablage; Bemerkung`
+
+The export preserves each sheet's listed column ordering. Computed fields are exported with their current calculated values; source rows and formulas remain unchanged.

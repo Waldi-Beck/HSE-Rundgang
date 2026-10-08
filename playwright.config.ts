@@ -1,4 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
+import { existsSync } from 'node:fs';
+
+const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const chromiumExecutable = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ?? (existsSync(edgePath) ? edgePath : undefined);
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -7,6 +11,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4173',
     ...devices['Pixel 7'],
+    ...(chromiumExecutable ? { launchOptions: { executablePath: chromiumExecutable } } : {}),
     locale: 'de-CH',
     timezoneId: 'Europe/Zurich',
     acceptDownloads: true,

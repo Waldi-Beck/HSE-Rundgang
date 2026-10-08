@@ -1,7 +1,7 @@
 import { DownloadSimple, UploadSimple } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
-import { LEGAL_FOOTNOTE, SOP_META } from '../data/checklist';
-import { db } from '../db';
+import { SOP_META } from '../data/checklist';
+import { importBackupData } from '../db';
 import { exportBackupJson } from '../export';
 import { backupPhotosToBlobs, parseBackup } from '../lib/backup';
 import { formatDate } from '../lib/dates';
@@ -38,12 +38,11 @@ export function BackupPage() {
     try {
       const b = parseBackup(await file.text());
       const photos = await backupPhotosToBlobs(b.photos);
-      await db.transaction('rw', db.walks, db.defects, db.photos, async () => {
-        await db.walks.bulkPut(b.walks);
-        await db.defects.bulkPut(b.defects);
-        await db.photos.bulkPut(photos);
-      });
-      toast(`Importiert: ${b.walks.length} Rundgänge, ${b.defects.length} Mängel, ${photos.length} Fotos.`);
+      const result = await importBackupData(b.walks, b.defects, photos, b.inspections, b.settings);
+      const collisions = result.collisions.length
+        ? ` Nummernkonflikte übersprungen: ${[...new Set(result.collisions)].join(', ')}.`
+        : '';
+      toast(`Importiert: ${result.walks} Rundgänge, ${result.defects} Mängel, ${result.photos} Fotos, ${result.inspections} Prüftermine.${collisions}`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -113,7 +112,6 @@ export function BackupPage() {
           <dt className="text-muted">Ersteller</dt>
           <dd>{SOP_META.author}</dd>
         </dl>
-        <p className="mt-3 text-muted">{LEGAL_FOOTNOTE}</p>
       </section>
     </div>
   );

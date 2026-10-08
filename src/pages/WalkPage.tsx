@@ -2,7 +2,6 @@ import { ArrowLeft, LockSimple } from '@phosphor-icons/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useState } from 'react';
 import { Link, NavLink, Navigate, useParams } from 'react-router';
-import { TYPE_LABELS } from '../data/checklist';
 import { db, newDefectDraft } from '../db';
 import { weekLabel } from '../lib/dates';
 import type { Defect } from '../lib/types';
@@ -15,10 +14,10 @@ import { DefectsTab } from './walk/DefectsTab';
 import { CloseTab } from './walk/CloseTab';
 
 const TABS = [
-  { key: 'daten', label: 'Daten' },
-  { key: 'checkliste', label: 'Checkliste' },
-  { key: 'maengel', label: 'Mängel' },
-  { key: 'abschluss', label: 'Abschluss' },
+  { key: 'daten', label: '1. Daten' },
+  { key: 'checkliste', label: '2. Checkliste' },
+  { key: 'maengel', label: '3. Mängel' },
+  { key: 'abschluss', label: '4. Abschluss' },
 ] as const;
 
 export function WalkPage() {
@@ -58,8 +57,9 @@ export function WalkPage() {
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg leading-tight font-semibold tabular-nums">{weekLabel(walk.isoYear, walk.week)}</h1>
             <p className="truncate text-sm text-muted">
-              {TYPE_LABELS[walk.type]}, {c.checked}/{c.total} bewertet
+              {c.checked}/{c.total} Felder bewertet
             </p>
+            <p className="truncate text-xs font-medium text-muted" data-testid="walk-docnr">{walk.docNr}</p>
           </div>
           {closed ? (
             <Badge tone="ok">

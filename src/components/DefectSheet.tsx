@@ -1,32 +1,38 @@
-import { X } from '@phosphor-icons/react';
+import { Trash, X } from '@phosphor-icons/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
-import { MONTHLY_ITEMS, PRIO, WEEKLY_ITEMS } from '../data/checklist';
+import { FORM_AREAS, MONTHLY_ITEMS, WEEKLY_ITEMS } from '../data/checklist';
+import { PRIORITIES, PRIORITY_KEY_TO_TEXT } from '../data/register';
 import { db, deleteDefect, saveDefect } from '../db';
-import type { Defect, Prio, Walk } from '../lib/types';
-import { areasForItem, defectMissingFields, defectPointLabel, dueFromPrio } from '../lib/walk';
+import { addDays } from '../lib/dates';
+import { priorityDays } from '../lib/register';
+import type { Defect, PriorityKey, Walk } from '../lib/types';
+import { defectMissingFields, isWeeklyItem } from '../lib/walk';
+import { useRegisterSettings } from './SettingsContext';
 import { PhotoInput, type PhotoDraft } from './PhotoInput';
 import { Field } from './ui';
 
-/** Formular Kapitel 4: Pkt. und Bereich, Mangel / Gefahr, Massnahme, Verantwortlich, Frist, Prio, Fotos (FR-030 bis FR-034). */
 export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Defect; onClose: (saved: boolean) => void }) {
+  const settings = useRegisterSettings();
   const readOnly = walk.status === 'closed';
-  const [d, setD] = useState<Defect>(defect);
+  const [d, setD] = useState<Defect>(() => ({ ...defect, due: defect.due || addDays(walk.date, priorityDays(settings, defect.priority)) }));
   const [newPhotos, setNewPhotos] = useState<PhotoDraft[]>([]);
   const [removed, setRemoved] = useState<string[]>([]);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
-
   const stored = useLiveQuery(() => db.photos.where('defectId').equals(defect.id).toArray(), [defect.id]);
   const isExisting = useLiveQuery(async () => !!(await db.defects.get(defect.id)), [defect.id]);
-
   const photos: PhotoDraft[] = [
-    ...(stored ?? []).filter((p) => !removed.includes(p.id)).map((p) => ({ ...p, isNew: false })),
+    ...(stored ?? []).filter((photo) => !removed.includes(photo.id)).map((photo) => ({ ...photo, isNew: false })),
     ...newPhotos,
   ];
+  const items = walk.monthlyChecked ? [...WEEKLY_ITEMS, ...MONTHLY_ITEMS] : WEEKLY_ITEMS;
+  const weekly = d.itemId ? isWeeklyItem(d.itemId) : true;
+  const areaOptions = weekly ? FORM_AREAS.map((area) => ({ id: area.id, label: area.label })) : settings.areas.map((area) => ({ id: area, label: area }));
+  const missing = defectMissingFields(d);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose(false);
+    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose(false);
     window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => {
@@ -35,9 +41,12 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
     };
   }, [onClose]);
 
-  const set = (patch: Partial<Defect>) => setD((cur) => ({ ...cur, ...patch }));
-  const setPrio = (prio: Prio) => set({ prio, due: dueFromPrio(walk.date, prio) });
-  const missing = defectMissingFields(d);
+  const set = (patch: Partial<Defect>) => setD((current) => ({ ...current, ...patch }));
+  const setItem = (itemId: string) => {
+    const monthly = itemId.startsWith('M');
+    set({ itemId, area: monthly ? (settings.areas.includes(d.area) ? d.area : '') : (FORM_AREAS.some((area) => area.id === d.area) ? d.area : '') });
+  };
+  const setPriority = (priority: PriorityKey) => set({ priority, due: addDays(walk.date, priorityDays(settings, priority)) });
 
   const save = async () => {
     if (missing.length) {
@@ -52,140 +61,83 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
   };
 
   const remove = async () => {
-    if (!confirm(`Mangel Nr. ${d.nr} mit allen Fotos löschen?`)) return;
+    if (!confirm(`Mangel-ID ${d.mangelId} mit allen Fotos löschen?`)) return;
     await deleteDefect(d.id);
     onClose(true);
   };
-
-  const items = walk.type === 'monthly' ? [...WEEKLY_ITEMS, ...MONTHLY_ITEMS] : WEEKLY_ITEMS;
-  const areaOptions = d.itemId ? areasForItem(d.itemId) : [];
-  const setItem = (itemId: string) =>
-    set({ itemId, area: itemId && areasForItem(itemId).some((a) => a.id === d.area) ? d.area : '' });
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="defect-title" className="fixed inset-0 z-40 flex flex-col bg-bg">
       <div className="border-b border-line bg-surface pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-          <h2 id="defect-title" className="text-lg font-semibold">
-            Mangel Nr. {d.nr}
-            {d.itemId && <span className="font-normal text-muted"> zu {d.area ? defectPointLabel(d) : d.itemId}</span>}
-          </h2>
-          <button type="button" onClick={() => onClose(false)} aria-label="Schliessen" className="grid h-11 w-11 place-items-center rounded-lg">
-            <X size={22} aria-hidden />
-          </button>
+          <div>
+            <h2 id="defect-title" className="text-lg font-semibold">Mangel {d.mangelId}</h2>
+            <p className="text-sm text-muted">Nr. {d.nr} · {d.itemId || 'Kontrollpunkt wählen'}{d.area ? ` · ${d.area}` : ''}</p>
+          </div>
+          <button type="button" onClick={() => onClose(false)} aria-label="Schliessen" className="grid h-11 w-11 place-items-center rounded-lg"><X size={22} aria-hidden /></button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl space-y-5 px-4 py-5">
-          <Field label="Pkt. (Checklistenpunkt)" htmlFor="d-item" error={showErrors && !d.itemId ? 'Bitte Punkt wählen.' : undefined}>
-            <select id="d-item" className="field" value={d.itemId} disabled={readOnly} onChange={(e) => setItem(e.target.value)}>
+          <Field label="Kontrollpunkt" htmlFor="d-item" error={showErrors && !d.itemId ? 'Bitte Kontrollpunkt wählen.' : undefined}>
+            <select id="d-item" className="field" value={d.itemId} disabled={readOnly} onChange={(event) => setItem(event.target.value)}>
               <option value="">Bitte wählen</option>
-              {items.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.id}: {i.text}
-                </option>
-              ))}
+              {items.map((item) => <option key={item.id} value={item.id}>{item.id}: {item.text}</option>)}
             </select>
           </Field>
-
-          <Field
-            label="Bereich"
-            htmlFor="d-area"
-            hint={d.itemId && !d.itemId.startsWith('W') ? 'Monatspunkt: Bereich oder "Alle Bereiche / allgemein" wählen.' : undefined}
-            error={showErrors && !d.area ? 'Bitte Bereich wählen.' : undefined}
-          >
-            <select id="d-area" className="field" value={d.area} disabled={readOnly || !d.itemId} onChange={(e) => set({ area: e.target.value })}>
-              <option value="">{d.itemId ? 'Bitte wählen' : 'Zuerst Pkt. wählen'}</option>
-              {areaOptions.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                </option>
-              ))}
+          <Field label="Bereich" htmlFor="d-area" error={showErrors && !d.area ? 'Bitte Bereich wählen.' : undefined}>
+            <select id="d-area" className="field" value={d.area} disabled={readOnly || !d.itemId} onChange={(event) => set({ area: event.target.value })}>
+              <option value="">Bereich wählen</option>
+              {areaOptions.map((area) => <option key={area.id} value={area.id}>{area.label}</option>)}
             </select>
           </Field>
-
-          <Field label="Mangel / Gefahr" htmlFor="d-hazard" error={showErrors && !d.hazard.trim() ? 'Bitte Mangel beschreiben.' : undefined}>
-            <textarea id="d-hazard" rows={3} className="field" value={d.hazard} disabled={readOnly} onChange={(e) => set({ hazard: e.target.value })} />
+          <Field label="Beschreibung des Mangels" htmlFor="d-description" error={showErrors && !d.description.trim() ? 'Bitte den Mangel beschreiben.' : undefined}>
+            <textarea id="d-description" rows={2} className="field" value={d.description} disabled={readOnly} onChange={(event) => set({ description: event.target.value })} />
           </Field>
-
+          <Field label="Festgestellte Gefahr" htmlFor="d-hazard" error={showErrors && !d.hazard.trim() ? 'Bitte die Gefahr beschreiben.' : undefined}>
+            <textarea id="d-hazard" rows={2} className="field" value={d.hazard} disabled={readOnly} onChange={(event) => set({ hazard: event.target.value })} />
+          </Field>
+          <Field label="Sofortmassnahme" htmlFor="d-immediate">
+            <textarea id="d-immediate" rows={2} className="field" value={d.immediateAction} disabled={readOnly} onChange={(event) => set({ immediateAction: event.target.value })} />
+          </Field>
           <Field label="Massnahme" htmlFor="d-action">
-            <textarea id="d-action" rows={2} className="field" value={d.action} disabled={readOnly} onChange={(e) => set({ action: e.target.value })} />
+            <textarea id="d-action" rows={2} className="field" value={d.action} disabled={readOnly} onChange={(event) => set({ action: event.target.value })} />
           </Field>
-
-          <Field label="Verantwortlich" htmlFor="d-resp">
-            <input id="d-resp" className="field" value={d.responsible} disabled={readOnly} onChange={(e) => set({ responsible: e.target.value })} autoComplete="name" />
+          <Field label="Verantwortlich" htmlFor="d-responsible">
+            <input id="d-responsible" className="field" value={d.responsible} disabled={readOnly} onChange={(event) => set({ responsible: event.target.value })} />
           </Field>
 
           <fieldset>
-            <legend className="label">Prio</legend>
-            <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Prio">
-              {(Object.keys(PRIO) as Prio[]).map((p) => {
-                const active = d.prio === p;
-                const tone = p === 'K' ? 'bg-danger text-white border-danger dark:text-zinc-950' : 'bg-ink text-bg border-ink';
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    data-testid={`prio-${p}`}
-                    disabled={readOnly}
-                    onClick={() => setPrio(p)}
-                    className={`flex min-h-14 flex-col items-center justify-center rounded-lg border leading-tight ${active ? tone : 'border-line-strong bg-surface'}`}
-                  >
-                    <span className="text-base font-semibold">{p}</span>
-                    <span className={`text-xs ${active ? '' : 'text-muted'}`}>{PRIO[p].hint}</span>
-                  </button>
-                );
+            <legend className="label">Priorität</legend>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Priorität">
+              {(Object.keys(PRIORITIES) as PriorityKey[]).map((priority) => {
+                const active = d.priority === priority;
+                return <button key={priority} type="button" role="radio" aria-checked={active} data-testid={`prio-${priority}`} disabled={readOnly} onClick={() => setPriority(priority)} className={`flex min-h-12 items-center justify-between rounded-lg border px-3 ${active ? (priority === 'K' ? 'border-danger bg-danger-soft text-danger' : 'border-accent bg-accent-soft text-ink') : 'border-line-strong bg-surface'}`}><span className="font-semibold">{PRIORITY_KEY_TO_TEXT[priority]}</span><span className="text-sm">{settings.priorityDays[priority]} Tage</span></button>;
               })}
             </div>
           </fieldset>
-
-          <Field label="Frist" htmlFor="d-due" hint="Vorschlag aus der Prio (Richtwert gemäss SOP), anpassbar.">
-            <input id="d-due" type="date" className="field" value={d.due} disabled={readOnly} onChange={(e) => set({ due: e.target.value })} />
+          <Field label="Frist" htmlFor="d-due" hint="Vorschlag aus den Einstellungen. Bei leerer Frist gilt automatisch die Richtfrist.">
+            <input id="d-due" type="date" className="field" value={d.due} disabled={readOnly} onChange={(event) => set({ due: event.target.value })} />
           </Field>
-
           <fieldset>
             <legend className="label">Fotos</legend>
-            <PhotoInput
-              photos={photos}
-              disabled={readOnly}
-              onAdd={(p) => setNewPhotos((cur) => [...cur, ...p])}
-              onRemove={(id) => {
-                setNewPhotos((cur) => cur.filter((p) => p.id !== id));
-                if (stored?.some((p) => p.id === id)) setRemoved((r) => [...r, id]);
-              }}
-            />
+            <PhotoInput photos={photos} disabled={readOnly} onAdd={(added) => setNewPhotos((current) => [...current, ...added])} onRemove={(id) => {
+              setNewPhotos((current) => current.filter((photo) => photo.id !== id));
+              if (stored?.some((photo) => photo.id === id)) setRemoved((current) => [...current, id]);
+            }} />
           </fieldset>
-
-          {showErrors && missing.length > 0 && (
-            <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">Fehlt: {missing.join(', ')}</p>
-          )}
+          {showErrors && missing.length > 0 && <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">Fehlt: {missing.join(', ')}</p>}
         </div>
       </div>
 
       <div className="border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-3xl gap-2 px-4 py-3">
-          {readOnly ? (
-            <button type="button" className="btn-secondary flex-1" onClick={() => onClose(false)}>
-              Schliessen
-            </button>
-          ) : (
-            <>
-              {isExisting && (
-                <button type="button" className="btn-danger" onClick={remove}>
-                  Löschen
-                </button>
-              )}
-              <button type="button" className="btn-secondary" onClick={() => onClose(false)}>
-                Abbrechen
-              </button>
-              <button type="button" className="btn-primary flex-1" disabled={saving} onClick={save} data-testid="defect-save">
-                {saving ? 'Speichert' : 'Mangel speichern'}
-              </button>
-            </>
-          )}
+          {readOnly ? <button type="button" className="btn-secondary flex-1" onClick={() => onClose(false)}>Schliessen</button> : <>
+            {isExisting && <button type="button" className="btn-danger" onClick={() => void remove()} aria-label="Mangel löschen"><Trash size={18} aria-hidden /></button>}
+            <button type="button" className="btn-secondary" onClick={() => onClose(false)}>Abbrechen</button>
+            <button type="button" className="btn-primary flex-1" disabled={saving} onClick={() => void save()} data-testid="defect-save">{saving ? 'Speichert' : 'Mangel speichern'}</button>
+          </>}
         </div>
       </div>
     </div>

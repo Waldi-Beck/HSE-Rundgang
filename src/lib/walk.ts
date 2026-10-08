@@ -1,47 +1,30 @@
-/** Fachlogik zum Rundgang (reine Funktionen, ohne UI und Datenbank). */
-import {
-  AREAS,
-  GENERAL_AREA,
-  MONTHLY_ITEMS,
-  WEEKLY_ITEMS,
-  areaLabel,
-  findItem,
-  type AreaId,
-} from '../data/checklist';
-import { addDays, addMonths, formatDate, weekLabel } from './dates';
-import type { Defect, Prio, Rating, ResultKey, Walk, WalkType } from './types';
+import { CHECKLIST_ITEM_BY_ID, FORM_AREAS, MONTHLY_ITEMS, REGISTER_AREA_DEFAULTS, WEEKLY_ITEMS, areaLabel } from '../data/checklist';
+import { createMangelId, weekLabel } from './dates';
+import { priorityDays, validDefectDue } from './register';
+import type { Defect, Walk } from './types';
 
-/** Bewertungsschlüssel: Wochenpunkt je Bereich `W4@qlabs`, Monatspunkt `M1`. */
 export function cellKey(itemId: string, area?: string): string {
   return area ? `${itemId}@${area}` : itemId;
 }
 
 export function parseCellKey(key: string): { itemId: string; area: string } {
-  const [itemId, area = ''] = key.split('@');
-  return { itemId, area };
+  const separator = key.indexOf('@');
+  return separator < 0 ? { itemId: key, area: '' } : { itemId: key.slice(0, separator), area: key.slice(separator + 1) };
 }
 
-export const isWeeklyItem = (itemId: string) => /^W\d+$/.test(itemId);
+export const isWeeklyItem = (itemId: string) => /^R(?:[1-9]|1[0-5])$/.test(itemId);
+export const isMonthlyItem = (itemId: string) => /^M[1-9]$/.test(itemId);
 
-/** Schlüssel der 96 Zellen der Matrix 2.1 (je Bereich 16 Punkte). */
-export function weeklyKeys(area?: AreaId): string[] {
-  const areas = area ? [area] : AREAS.map((a) => a.id);
-  return areas.flatMap((a) => WEEKLY_ITEMS.map((i) => cellKey(i.id, a)));
+export function weeklyKeys(area?: string): string[] {
+  const areas = area ? [area] : FORM_AREAS.map((formArea) => formArea.id);
+  return areas.flatMap((areaId) => WEEKLY_ITEMS.map((item) => cellKey(item.id, areaId)));
 }
 
-/** SOP 1/2: Wochenrundgang = 2.1 (96 Zellen); Monatsrundgang = 2.1 + 2.2 (96 + 9). */
-export function ratableKeys(type: WalkType): string[] {
-  const weekly = weeklyKeys();
-  return type === 'monthly' ? [...weekly, ...MONTHLY_ITEMS.map((i) => i.id)] : weekly;
+export function requiredRatingKeys(monthlyChecked: boolean): string[] {
+  return [...weeklyKeys(), ...(monthlyChecked ? MONTHLY_ITEMS.map((item) => item.id) : [])];
 }
 
-/** Zulässige Bereiche für einen Mangel zum Punkt: Wochenpunkt = 6 Bereiche, Monatspunkt zusätzlich "allgemein". */
-export function areasForItem(itemId: string): { id: string; label: string }[] {
-  const list: { id: string; label: string }[] = AREAS.map((a) => ({ id: a.id, label: a.label }));
-  return isWeeklyItem(itemId) ? list : [...list, { id: GENERAL_AREA.id, label: GENERAL_AREA.label }];
-}
-
-export interface Counts {
+export interface RatingCounts {
   total: number;
   checked: number;
   ok: number;
@@ -49,133 +32,113 @@ export interface Counts {
   na: number;
 }
 
-/** Fortschritt und Verteilung über eine Menge von Zellen (Standard: alle des Rundgangs). */
-export function countRatings(walk: Pick<Walk, 'type' | 'ratings'>, keys = ratableKeys(walk.type)): Counts {
-  const c: Counts = { total: keys.length, checked: 0, ok: 0, mangel: 0, na: 0 };
-  for (const k of keys) {
-    const r: Rating | undefined = walk.ratings[k];
-    if (!r) continue;
-    c.checked++;
-    c[r]++;
+export function countRatings(walk: Pick<Walk, 'ratings' | 'monthlyChecked'>, keys = requiredRatingKeys(walk.monthlyChecked)): RatingCounts {
+  const count: RatingCounts = { total: keys.length, checked: 0, ok: 0, mangel: 0, na: 0 };
+  for (const key of keys) {
+    const rating = walk.ratings[key];
+    if (!rating) continue;
+    count.checked++;
+    count[rating]++;
   }
-  return c;
+  return count;
 }
 
-/** SOP 3: "Anzahl Mängel" (Einträge in Kapitel 4) und "davon kritisch (K)". */
-export function defectCounts(defects: Pick<Defect, 'prio'>[]): { total: number; critical: number } {
-  return { total: defects.length, critical: defects.filter((d) => d.prio === 'K').length };
-}
-
-/** SOP 4: K sofort, H 48 Std., M 1 Woche, N 1 Monat (Richtwerte). */
-export function dueFromPrio(walkDate: string, prio: Prio): string {
-  switch (prio) {
-    case 'K':
-      return walkDate;
-    case 'H':
-      return addDays(walkDate, 2);
-    case 'M':
-      return addDays(walkDate, 7);
-    case 'N':
-      return addMonths(walkDate, 1);
-  }
-}
-
-/** FR-003: Monatsrundgang, wenn im selben Kalendermonat noch kein anderer Rundgang existiert. */
-export function suggestType(date: string, otherWalkDates: string[]): WalkType {
+export function firstWalkOfMonth(date: string, otherDates: string[]): boolean {
   const month = date.slice(0, 7);
-  return otherWalkDates.some((d) => d.slice(0, 7) === month) ? 'weekly' : 'monthly';
+  return !otherDates.some((otherDate) => otherDate.slice(0, 7) === month && otherDate <= date);
 }
 
-/**
- * FR-022 Ergebnis-Vorschlag:
- * keine Mängel -> Ohne Beanstandung; Prio K -> Kritischer Mangel;
- * offener Mangel Prio H -> Offene Massnahmen; sonst Geringfügige Mängel.
- */
-export function suggestResult(defects: Pick<Defect, 'prio' | 'status'>[]): ResultKey {
-  if (defects.length === 0) return 'none';
-  if (defects.some((d) => d.prio === 'K')) return 'critical';
-  if (defects.some((d) => d.prio === 'H' && d.status === 'open')) return 'open';
-  return 'minor';
+export function suggestMonthlyChecked(date: string, otherDates: string[]): boolean {
+  return firstWalkOfMonth(date, otherDates);
 }
 
-/** Mängel, die zu einer Zelle gehören: Wochenzelle = gleicher Punkt und Bereich, Monatspunkt = gleicher Punkt. */
+export function areasForItem(itemId: string, registerAreas: string[] = [...REGISTER_AREA_DEFAULTS]): { id: string; label: string }[] {
+  if (isWeeklyItem(itemId)) return FORM_AREAS.map((area) => ({ id: area.id, label: area.label }));
+  return registerAreas.map((label) => ({ id: label, label }));
+}
+
 export function defectsForCell<T extends Pick<Defect, 'itemId' | 'area'>>(key: string, defects: T[]): T[] {
   const { itemId, area } = parseCellKey(key);
-  return defects.filter((d) => d.itemId === itemId && (!area || d.area === area));
+  return defects.filter((defect) => defect.itemId === itemId && defect.area === area);
 }
 
-/** Zellen "Mangel" ohne Mangel mit passendem Punkt und Bereich (FR-024). */
-export function mangelWithoutDefect(walk: Pick<Walk, 'type' | 'ratings'>, defects: Pick<Defect, 'itemId' | 'area'>[]): string[] {
-  return ratableKeys(walk.type).filter((k) => walk.ratings[k] === 'mangel' && defectsForCell(k, defects).length === 0);
+export function mangelWithoutDefect(walk: Pick<Walk, 'ratings' | 'monthlyChecked' | 'monthlyAreas'>, defects: Pick<Defect, 'itemId' | 'area'>[]): string[] {
+  return requiredRatingKeys(walk.monthlyChecked).flatMap((key) => {
+    if (walk.ratings[key] !== 'mangel') return [];
+    const areaKey = isMonthlyItem(key) ? cellKey(key, walk.monthlyAreas[key] ?? '') : key;
+    return defectsForCell(areaKey, defects).length ? [] : [areaKey];
+  });
 }
 
-/** Lesbare Bezeichnung einer Zelle, z. B. "W4 / QLabs". */
 export function cellLabel(key: string): string {
   const { itemId, area } = parseCellKey(key);
-  return area ? `${itemId} / ${areaLabel(area)}` : itemId;
+  const formArea = FORM_AREAS.find((candidate) => candidate.id === area);
+  return area ? `${itemId} / ${formArea?.label ?? areaLabel(area)}` : itemId;
 }
 
-export function defectMissingFields(d: Pick<Defect, 'itemId' | 'area' | 'hazard' | 'prio' | 'due'>): string[] {
+export function defectPointLabel(defect: Pick<Defect, 'itemId' | 'area'>): string {
+  const formArea = FORM_AREAS.find((candidate) => candidate.id === defect.area);
+  return defect.area ? `${defect.itemId} / ${formArea?.label ?? defect.area}` : defect.itemId;
+}
+
+export function nextDefectNr(defects: Pick<Defect, 'nr'>[]): number {
+  return defects.reduce((max, defect) => Math.max(max, defect.nr), 0) + 1;
+}
+
+export function newMangelId(date: string, nr: number): string {
+  return createMangelId(date, nr);
+}
+
+export function defectMissingFields(defect: Pick<Defect, 'itemId' | 'area' | 'description' | 'hazard' | 'priority'>): string[] {
   const missing: string[] = [];
-  if (!d.itemId) missing.push('Pkt.');
-  if (!d.area) missing.push('Bereich');
-  if (!d.hazard.trim()) missing.push('Mangel/Gefahr');
-  if (!d.prio) missing.push('Prio');
-  if (!d.due) missing.push('Frist');
+  if (!defect.itemId) missing.push('Kontrollpunkt');
+  if (!defect.area) missing.push('Bereich');
+  if (!defect.description.trim()) missing.push('Beschreibung des Mangels');
+  if (!defect.hazard.trim()) missing.push('Festgestellte Gefahr');
+  if (!defect.priority) missing.push('Priorität');
   return missing;
 }
 
-/** Punkt und Bereich passen zusammen (Wochenpunkt nur mit einem der 6 Bereiche). */
-export function defectAreaValid(d: Pick<Defect, 'itemId' | 'area'>): boolean {
-  return areasForItem(d.itemId).some((a) => a.id === d.area);
+export function defectAreaValid(defect: Pick<Defect, 'itemId' | 'area'>, registerAreas: string[] = [...REGISTER_AREA_DEFAULTS]): boolean {
+  return areasForItem(defect.itemId, registerAreas).some((area) => area.id === defect.area);
 }
 
-function summarize(list: string[], max = 8): string {
-  return list.length > max ? `${list.slice(0, max).join(', ')} und ${list.length - max} weitere` : list.join(', ');
+function summarize(values: string[], max = 8): string {
+  return values.length > max ? `${values.slice(0, max).join(', ')} und ${values.length - max} weitere` : values.join(', ');
 }
 
-/** FR-024: Liste der Gründe, die den Abschluss verhindern (leer = abschliessbar). */
-export function validateForClose(walk: Walk, defects: Defect[]): string[] {
+export function validateForClose(walk: Walk, defects: Defect[], registerAreas: string[] = [...REGISTER_AREA_DEFAULTS]): string[] {
   const errors: string[] = [];
   if (!walk.date) errors.push('Datum fehlt (Kapitel 1).');
-  if (!walk.inspector.trim()) errors.push('"Durchgeführt von" fehlt (Kapitel 1).');
-  const open = ratableKeys(walk.type).filter((k) => !walk.ratings[k]);
-  if (open.length) {
-    errors.push(`${open.length} Feld${open.length === 1 ? '' : 'er'} nicht bewertet: ${summarize(open.map(cellLabel))}.`);
+  if (!walk.startTime) errors.push('Beginn fehlt (Kapitel 1).');
+  if (!walk.endTime) errors.push('Ende fehlt (Kapitel 1).');
+  if (!walk.inspector.trim()) errors.push('Durchgeführt von fehlt (Kapitel 1).');
+  const incomplete = requiredRatingKeys(walk.monthlyChecked).filter((key) => !walk.ratings[key]);
+  if (incomplete.length) errors.push(`${incomplete.length} Felder nicht bewertet: ${summarize(incomplete.map(cellLabel))}.`);
+  if (walk.monthlyChecked) {
+    const missingMonthlyAreas = MONTHLY_ITEMS.filter((item) => !walk.monthlyAreas[item.id]);
+    if (missingMonthlyAreas.length) errors.push(`Bereich fehlt für Monatspunkte: ${summarize(missingMonthlyAreas.map((item) => item.id))}.`);
   }
-  for (const k of mangelWithoutDefect(walk, defects)) {
-    errors.push(`${cellLabel(k)} ist "Mangel", aber ohne Eintrag in Kapitel 4.`);
+  for (const key of mangelWithoutDefect(walk, defects)) errors.push(`${cellLabel(key)} ist Mangel, aber ohne Eintrag in Kapitel 3.`);
+  for (const defect of defects) {
+    const missing = defectMissingFields(defect);
+    if (missing.length) errors.push(`Mangel Nr. ${defect.nr}: ${missing.join(', ')} fehlt.`);
+    else if (!CHECKLIST_ITEM_BY_ID.has(defect.itemId)) errors.push(`Mangel Nr. ${defect.nr}: Kontrollpunkt ${defect.itemId} unbekannt.`);
+    else if (!defectAreaValid(defect, registerAreas)) errors.push(`Mangel Nr. ${defect.nr}: Bereich passt nicht zu ${defect.itemId}.`);
   }
-  for (const d of defects) {
-    const m = defectMissingFields(d);
-    if (m.length) errors.push(`Mangel Nr. ${d.nr}: ${m.join(', ')} fehlt.`);
-    else if (!findItem(d.itemId)) errors.push(`Mangel Nr. ${d.nr}: Pkt. "${d.itemId}" unbekannt.`);
-    else if (!defectAreaValid(d)) errors.push(`Mangel Nr. ${d.nr}: Bereich passt nicht zu Pkt. ${d.itemId}.`);
-  }
-  if (!walk.result) errors.push('Gesamtergebnis nicht gewählt (Kapitel 3).');
-  if (!walk.signature.name.trim()) errors.push('Name Durchführende/r fehlt (Kapitel 3).');
-  if (!walk.signature.image) errors.push('Unterschrift Durchführende/r fehlt (Kapitel 3).');
+  if (!walk.result) errors.push('Gesamtbewertung fehlt (Kapitel 4).');
+  if (!walk.signature.name.trim()) errors.push('Name Durchführende/r fehlt (Kapitel 4).');
+  if (!walk.signature.image) errors.push('Unterschrift Durchführende/r fehlt (Kapitel 4).');
   return errors;
 }
 
-/** Nächste Mangel-Nr. innerhalb eines Rundgangs. */
-export function nextDefectNr(defects: Pick<Defect, 'nr'>[]): number {
-  return defects.reduce((m, d) => Math.max(m, d.nr), 0) + 1;
-}
-
-/** Bewertungen, die durch einen Wechsel auf "weekly" ausgeblendet würden (Monatsteil 2.2). */
-export function hiddenRatingsOnWeekly(walk: Pick<Walk, 'ratings'>): string[] {
-  const weekly = new Set(ratableKeys('weekly'));
-  return Object.keys(walk.ratings).filter((k) => !weekly.has(k));
-}
-
-/** "W4 / QLabs" für einen Mangel */
-export function defectPointLabel(d: Pick<Defect, 'itemId' | 'area'>): string {
-  return d.area ? `${d.itemId} / ${areaLabel(d.area)}` : d.itemId;
-}
-
-/** Einzeilige Beschreibung eines offenen Punkts aus einem früheren Rundgang. */
-export function openPointLabel({ defect, walk }: { defect: Defect; walk?: Walk }): string {
+export function openPointLabel(defect: Defect, walk?: Walk): string {
   const origin = walk ? `${weekLabel(walk.isoYear, walk.week)} ` : '';
-  return `${origin}Nr. ${defect.nr} (${defectPointLabel(defect)}): ${defect.hazard}, Frist ${formatDate(defect.due)}, Prio ${defect.prio}`;
+  return `${origin}${defect.mangelId} (${defectPointLabel(defect)}): ${defect.description}, Status ${defect.status}`;
 }
+
+export function isRequiredMonthlyRating(itemId: string, monthlyChecked: boolean): boolean {
+  return isMonthlyItem(itemId) && monthlyChecked;
+}
+
+export { priorityDays, validDefectDue };

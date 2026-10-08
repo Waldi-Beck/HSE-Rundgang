@@ -1,19 +1,16 @@
-/** JSON-Sicherung und CSV-Mängelregister (contracts/backup-format.md). */
-import { SOP_META, areaLabel } from '../data/checklist';
-import { formatDate, weekLabel } from './dates';
+/** Complete local backup, including the round register, follow-up fields, inspection plan, settings and photos. */
+import { SOP_META } from '../data/checklist';
+import { parseWalkNumber } from './dates';
 import { blobToDataUrl, dataUrlToBlob } from './image';
-import type { Defect, Photo, Walk } from './types';
+import type { Defect, Inspection, Photo, RegisterSettings, Walk } from './types';
 
 export const BACKUP_FORMAT = 'qps-hse-rundgang-backup';
-/**
- * 2 = Formular mit Matrix 2.1 je Bereich, 2.2 Monatlich, Bewertung OK / Mangel / n.a., Mangel mit Bereich.
- * Version 1 (alte Checkliste A bis G, M1 bis M12) kann nicht eingelesen werden.
- */
-export const BACKUP_VERSION = 2;
+export const BACKUP_VERSION = 4;
 
 export interface BackupPhoto extends Omit<Photo, 'blob'> {
   dataUrl: string;
 }
+
 export interface BackupFile {
   format: typeof BACKUP_FORMAT;
   formatVersion: number;
@@ -22,9 +19,17 @@ export interface BackupFile {
   walks: Walk[];
   defects: Defect[];
   photos: BackupPhoto[];
+  inspections: Inspection[];
+  settings: RegisterSettings;
 }
 
-export async function buildBackup(walks: Walk[], defects: Defect[], photos: Photo[]): Promise<BackupFile> {
+export async function buildBackup(
+  walks: Walk[],
+  defects: Defect[],
+  photos: Photo[],
+  inspections: Inspection[],
+  settings: RegisterSettings,
+): Promise<BackupFile> {
   return {
     format: BACKUP_FORMAT,
     formatVersion: BACKUP_VERSION,
@@ -32,67 +37,39 @@ export async function buildBackup(walks: Walk[], defects: Defect[], photos: Phot
     sop: { docId: SOP_META.docId, version: SOP_META.version },
     walks,
     defects,
-    photos: await Promise.all(
-      photos.map(async ({ blob, ...rest }) => ({ ...rest, dataUrl: await blobToDataUrl(blob) })),
-    ),
+    photos: await Promise.all(photos.map(async ({ blob, ...rest }) => ({ ...rest, dataUrl: await blobToDataUrl(blob) }))),
+    inspections,
+    settings,
   };
 }
 
 export function parseBackup(text: string): BackupFile {
   let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error('Datei ist kein gültiges JSON.');
+  try { data = JSON.parse(text); }
+  catch { throw new Error('Datei ist kein gültiges JSON.'); }
+  const backup = data as Partial<BackupFile>;
+  if (backup.format !== BACKUP_FORMAT) throw new Error('Keine Sicherungsdatei der HSE Rundgang App.');
+  if (typeof backup.formatVersion !== 'number') throw new Error('Sicherungsdatei ist unvollständig (Formatversion fehlt).');
+  if (backup.formatVersion < BACKUP_VERSION) throw new Error('Diese Sicherung stammt aus einem älteren Formular oder Register und enthält nicht alle aktuellen Daten. Bitte aus der neuen App erneut sichern.');
+  if (backup.formatVersion > BACKUP_VERSION) throw new Error('Sicherungsformat ist neuer als diese App-Version. Bitte die App aktualisieren.');
+  if (!Array.isArray(backup.walks) || !Array.isArray(backup.defects) || !Array.isArray(backup.photos) || !Array.isArray(backup.inspections) || !backup.settings) {
+    throw new Error('Sicherungsdatei ist unvollständig. Rundgänge, Mängel, Fotos, Prüftermine und Einstellungen müssen enthalten sein.');
   }
-  const b = data as Partial<BackupFile>;
-  if (b?.format !== BACKUP_FORMAT) throw new Error('Keine Sicherungsdatei der HSE-Rundgang App.');
-  if (typeof b.formatVersion !== 'number') throw new Error('Sicherungsdatei ist unvollständig (Formatversion fehlt).');
-  if (b.formatVersion < BACKUP_VERSION)
-    throw new Error(
-      'Diese Sicherung stammt aus der alten Checkliste (Rubriken A bis G) und kann nicht eingelesen werden. Die App verwendet das neue Formular mit Bereichen (2.1 / 2.2).',
-    );
-  if (b.formatVersion > BACKUP_VERSION)
-    throw new Error('Sicherungsformat ist neuer als diese App-Version. Bitte die App aktualisieren.');
-  if (!Array.isArray(b.walks) || !Array.isArray(b.defects) || !Array.isArray(b.photos))
-    throw new Error('Sicherungsdatei ist unvollständig.');
-  return b as BackupFile;
+  if (backup.walks.some((walk) => !walk.docNr || !parseWalkNumber(walk.docNr))) throw new Error('Sicherungsdatei enthält eine ungültige Rundgangnummer.');
+  return backup as BackupFile;
 }
 
 export async function backupPhotosToBlobs(photos: BackupPhoto[]): Promise<Photo[]> {
   return Promise.all(photos.map(async ({ dataUrl, ...rest }) => ({ ...rest, blob: await dataUrlToBlob(dataUrl) })));
 }
 
-const csvCell = (v: string | number | null | undefined) => {
-  const s = String(v ?? '');
-  return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
-
-export const CSV_HEADER = [
-  'Rundgang', 'Datum', 'Nr', 'Pkt', 'Bereich', 'Mangel/Gefahr', 'Massnahme', 'Verantwortlich', 'Prio', 'Frist', 'Status', 'Erledigt am', 'Vermerk',
-];
-
-/** Excel-kompatibel: UTF-8 mit BOM, Semikolon, CRLF. */
-export function defectsToCsv(defects: Defect[], walksById: Map<string, Walk>): string {
-  const rows = defects.map((d) => {
-    const w = walksById.get(d.walkId);
-    return [
-      w ? weekLabel(w.isoYear, w.week) : '',
-      w ? formatDate(w.date) : '',
-      d.nr, d.itemId, areaLabel(d.area), d.hazard, d.action, d.responsible, d.prio, formatDate(d.due),
-      d.status === 'done' ? 'erledigt' : 'offen', formatDate(d.doneAt), d.doneNote,
-    ].map(csvCell).join(';');
-  });
-  return '﻿' + [CSV_HEADER.join(';'), ...rows].join('\r\n') + '\r\n';
-}
-
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }

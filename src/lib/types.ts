@@ -1,33 +1,33 @@
-import type { PRIO, RESULT_LABELS } from '../data/checklist';
+import type { PriorityKey, Rating, ResultKey } from '../data/checklist';
+export type { PriorityKey, Rating, ResultKey } from '../data/checklist';
 
-/** SOP 2 "Bewertung": OK / Mangel / n.a. */
-export type Rating = 'ok' | 'mangel' | 'na';
-export type WalkType = 'weekly' | 'monthly';
 export type WalkStatus = 'draft' | 'closed';
-export type Prio = keyof typeof PRIO;
-export type ResultKey = keyof typeof RESULT_LABELS;
 
 export interface Signature {
   name: string;
-  date: string; // YYYY-MM-DD
-  image: string; // PNG data URL, '' wenn noch nicht gezeichnet
+  date: string;
+  image: string;
 }
 
 export interface Walk {
   id: string;
-  date: string; // YYYY-MM-DD
+  /** Immutable annual app ID, independent of SOP_META.docId. */
+  docNr: string;
+  date: string;
   isoYear: number;
   week: number;
-  time: string; // HH:MM
+  startTime: string;
+  endTime: string;
   inspector: string;
   companion: string;
-  type: WalkType;
-  openPointsNote: string;
-  /** Beim Abschluss eingefrorene Liste offener Punkte aus früheren Rundgängen */
-  openPointsSnapshot: string[] | null;
-  /** Schlüssel: Wochenpunkt je Bereich `W4@qlabs`, Monatspunkt `M1` */
+  monthlyChecked: boolean;
+  /** R4@qlabs / M2@engineering -> status */
   ratings: Record<string, Rating>;
+  /** One selected area per monthly checklist item M1-M9. */
+  monthlyAreas: Record<string, string>;
+  openDefectSnapshot: string[] | null;
   result: ResultKey | null;
+  note: string;
   signature: Signature;
   acknowledgement: Signature;
   status: WalkStatus;
@@ -37,21 +37,29 @@ export interface Walk {
   closedAt: string | null;
 }
 
+export type DefectStatus = 'open' | 'inProgress' | 'done' | 'recheck';
+
 export interface Defect {
   id: string;
   walkId: string;
   nr: number;
+  mangelId: string;
   itemId: string;
-  /** Bereich (SOP 4 "Nr. / Pkt. / Bereich"): AreaId, bei Monatspunkten auch 'alle' */
   area: string;
+  description: string;
   hazard: string;
+  immediateAction: string;
   action: string;
   responsible: string;
-  prio: Prio;
-  due: string; // YYYY-MM-DD
-  status: 'open' | 'done';
+  priority: PriorityKey;
+  due: string;
+  status: DefectStatus;
   doneAt: string | null;
-  doneNote: string;
+  recheckAt: string | null;
+  controlledBy: string;
+  fixed: boolean | null;
+  newDue: string;
+  note: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,4 +71,44 @@ export interface Photo {
   width: number;
   height: number;
   createdAt: string;
+}
+
+export interface Inspection {
+  id: string;
+  description: string;
+  area: string;
+  intervalMonths: number | null;
+  lastInspection: string;
+  responsible: string;
+  evidence: string;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RegisterSettings {
+  id: 'app';
+  areas: string[];
+  priorityDays: Record<PriorityKey, number>;
+  maxIntervalDays: number;
+  updatedAt?: string;
+}
+
+export interface DerivedInspection extends Inspection {
+  nextDue: string;
+  status: 'überfällig' | 'bald fällig' | 'ok' | 'Datum fehlt' | 'Intervall fehlt';
+}
+
+export interface RoundRegisterRow {
+  index: number;
+  walk: Walk;
+  daysSincePrevious: number | null;
+  interval: 'eingehalten' | 'überschritten' | '';
+  durationMinutes: number | null;
+  defectCount: number;
+  criticalCount: number;
+  openCount: number;
+  pdfFilename: string;
+  firstOfMonth: boolean;
+  monthlyWarning: boolean;
 }

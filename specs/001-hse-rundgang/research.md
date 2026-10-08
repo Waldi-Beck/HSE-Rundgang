@@ -1,36 +1,33 @@
-# Research: HSE-Rundgang App
+# Research Decisions: Current HSE Rundgang Form and Register
 
-## R1 Datenhaltung ohne Backend
-- **Decision**: IndexedDB via Dexie 4, `useLiveQuery` für reaktive Ansichten.
-- **Rationale**: Speichert Blobs (Fotos) direkt, grosser Speicher, offline, keine Server-Infrastruktur nötig.
-- **Alternatives**: localStorage (5 MB, keine Blobs), SQLite/WASM (schwer), Backend (widerspricht Prinzip V).
+## R1 Source of truth
+- **Decision**: Use the supplied current DOTX and XLSX register content. The checked-in DOCX is an older form copy; do not alter either Word file or the register workbook.
+- **Rationale**: The DOTX contains the current HSE Rundgang title, R1-R15 and five rooms. The workbook contains the full new register logic, list values, priority guidance and inspection seeds.
 
-## R2 PDF-Export
-- **Decision**: jsPDF + jspdf-autotable, Fotos als JPEG eingebettet.
-- **Rationale**: Deterministischer Dateiname (`HSE-Rundgang_JJJJ-KWxx.pdf`), funktioniert offline und auf iOS, Tabellen mit Seitenumbruch.
-- **Alternatives**: Print-CSS (Dateiname und Layout vom Browser abhängig, auf Mobilgeräten unzuverlässig).
+## R2 Local persistence and schema migration
+- **Decision**: Continue with Dexie/IndexedDB and add a schema version after the existing v3.
+- **Rationale**: Offline usage and local photo blobs remain required. Previous form-shaped test data is non-production and may be cleared, while annual walk counters must survive to prevent number reuse.
 
-## R3 Fotoaufnahme
-- **Decision**: `<input type="file" accept="image/*" capture="environment" multiple>` plus zweites Input ohne `capture` für Galerie; Verkleinern per `createImageBitmap` + Canvas auf 1600 px, JPEG Qualität 0.8.
-- **Rationale**: Keine Kamera-Berechtigungslogik nötig, native Kamera-App, funktioniert auf iOS/Android. `createImageBitmap(..., {imageOrientation: 'from-image'})` berücksichtigt EXIF-Drehung.
-- **Alternatives**: `getUserMedia` (eigene Kamera-UI, mehr Code, schlechtere Bildqualität).
+## R3 Register calculations
+- **Decision**: Implement formula semantics as pure TypeScript functions. Deadline precedence is new recheck date, entered deadline, then walk date plus editable priority days. Inspection due date is last date plus interval months. Warning boundary is 30 days. Round interval uses the editable default 14 days.
+- **Rationale**: Calculations can be shared by app overview, tables and XLSX export and tested without rendering React.
 
-## R4 Kalenderwoche
-- **Decision**: Eigene ISO-8601-Funktion (Donnerstag-Regel), getestet an Jahresgrenzen.
-- **Alternatives**: date-fns (zusätzliche Abhängigkeit für eine Funktion).
+## R4 Excel export
+- **Decision**: Use ExcelJS for a client-side workbook with sheets Rundgänge, Mängel and Prüftermine, matching the source column order; export calculated values for immediate spreadsheet use.
+- **Rationale**: The requested output is a real .xlsx replacement with multiple sheets, unlike the previous CSV export.
 
-## R5 Routing und Hosting
-- **Decision**: HashRouter, Vite `base` aus Umgebungsvariable `BASE_PATH` (Default `./`).
-- **Rationale**: Funktioniert unter jedem Unterpfad (GitHub Pages `/<repo>/`, Intranet) ohne Server-Rewrites.
+## R5 PDF layout
+- **Decision**: Use jsPDF and autoTable, compact A4 layout modeled on the current two-page template. Draw rating glyphs as vector lines; embed original QPS logo on every page; include continuation pages only for overflow/photos.
+- **Rationale**: Works offline and offers deterministic page headers/footers and mobile downloads.
 
-## R6 Unterschrift
-- **Decision**: Eigenes Canvas-Pad mit Pointer Events, gespeichert als PNG-Data-URL.
-- **Rationale**: ~60 Zeilen, keine Abhängigkeit.
+## R6 Camera photos
+- **Decision**: Retain browser file inputs with `capture="environment"`, gallery selection and resize to 1600px JPEG.
+- **Rationale**: Uses native camera/gallery UI without permission flows and remains compatible with mobile browsers.
 
-## R7 Gestaltung (Taste-Skill)
-- **Decision**: Design read "regulierte, vertrauensorientierte Arbeits-App für Mobilgeräte, ruhig, gut lesbar im Werkstattlicht". Dials VARIANCE 3, MOTION 2, DENSITY 5.
-  Schrift Geist (lokal gebündelt, nicht Inter), Icons Phosphor, neutrale Zinc-Basis mit einem Akzent (Smaragd/Grün für Sicherheit; Rot/Bernstein nur semantisch für Mangel / überfällig), ein Radius-System (Karten 12 px, Steuerelemente 10 px), Labels über Feldern, keine Gedankenstriche in UI-Texten, Leer-/Fehlerzustände, Dark Mode über Tokens, `min-h-[100dvh]`.
-- **Note**: Taste-Skill nennt Dashboards/Formular-Apps als "out of scope"; angewendet werden daher nur die allgemeinen Regeln (Typografie, Farbe, Zustände, Formular-Kontrast, AI-Tells).
+## R7 UI direction
+- **Decision**: Preserve the current light, green, high-contrast work-app tokens. Mobile-first, 44px+ touch targets, low animation intensity, visible focus/empty/loading/error states.
+- **Rationale**: The Taste-Skill explicitly excludes dashboards and multistep forms; apply its generally relevant accessibility and calm visual principles without adopting marketing-page patterns.
 
-## R8 PWA
-- **Decision**: vite-plugin-pwa (`generateSW`, autoUpdate), Manifest mit Icons.
+## R8 Browser tests
+- **Decision**: Keep Playwright Chromium project, with the existing local Microsoft Edge fallback when managed Chromium is absent; do not run browser installation.
+- **Rationale**: Edge is Chromium-compatible and already present in the environment.

@@ -1,77 +1,24 @@
-/**
- * PDF-Bericht gemäss SOP 5 (FR-050, FR-051, FR-053).
- * Layout nach dem QPS-Formular QPS_HSE_00064 (Word, Stand 29.09.2026): Kopfzeile mit Dokumenten-ID,
- * Titel, Version, Gültig ab und QPS-Logo, Kapitel 1 bis 5, Fusszeile "Seite x von y".
- * Farben und Füllungen sind direkt aus der Vorlage übernommen.
- * Zeichen ausserhalb WinAnsi (✓ ✗ ☐ →) werden als Vektorgrafik gezeichnet, weil Helvetica sie nicht enthält.
- */
 import { jsPDF } from 'jspdf';
 import { autoTable, type CellHookData, type RowInput } from 'jspdf-autotable';
 import { QPS_LOGO_PNG, QPS_LOGO_RATIO } from '../assets/qpsLogo';
-import {
-  APPROVAL,
-  AREAS,
-  CHANGE_LOG,
-  LEGAL_BASES,
-  LEGAL_FOOTNOTE,
-  MONTHLY_ITEMS,
-  MONTHLY_TITLE,
-  NOT_IN_WALK_TEXT,
-  PRIO,
-  PROCEDURE_TEXT,
-  RESULT_LABELS,
-  SOP_META,
-  TYPE_FORM_LABELS,
-  WEEKLY_ITEMS,
-  WEEKLY_TITLE,
-  areaLabel,
-} from '../data/checklist';
-import { formatDate } from './dates';
+import { FORM_AREAS, FORM_SUBTITLE, FORM_TITLE, INTERVAL_NOTICE, MONTHLY_ITEMS, MONTHLY_NOTICE, NOT_IN_WALK_TEXT, PRIORITY_NOTE, RATING_LEGEND, SOP_META, WEEKLY_ITEMS, WEEKLY_NOTICE, areaLabel } from '../data/checklist';
+import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../data/register';
+import { durationMinutes, formatDate, formatDuration } from './dates';
 import { blobToDataUrl } from './image';
-import type { Defect, Photo, Prio, Rating, ResultKey, Walk } from './types';
-import { cellKey, defectCounts, defectsForCell, openPointLabel } from './walk';
+import { validDefectDue } from './register';
+import type { Defect, Photo, RegisterSettings, ResultKey, Walk } from './types';
+import { cellKey } from './walk';
 
-type RGB = [number, number, number];
-const hex = (h: string): RGB => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
-
-// Farben der Vorlage
-const C = {
-  ink: hex('000000'),
-  title: hex('215E99'),
-  heading: hex('0F4761'),
-  docId: hex('2503F3'),
-  muted: hex('595959'),
-  grey: hex('8C8C8C'),
-  green: hex('375623'),
-  orange: hex('C55A11'),
-  red: hex('C00000'),
-  amber: hex('7F6000'),
-  line: hex('808080'),
-  fillLabel: hex('F2F2F2'),
-  fillHead: hex('D9D9D9'),
-  fillOkHead: hex('E2EFDA'),
-  fillNokHead: hex('FBE3E3'),
-  fillNok: hex('FDF4F4'),
-  fillMinor: hex('FFF2CC'),
-  fillOpen: hex('FCE4D6'),
-};
-
-// Seitenränder der Vorlage (2.5 cm links/rechts)
-const ML = 25;
-const MR = 25;
-const TOP = 30; // Inhalt beginnt unter der Kopfzeile
-const BOTTOM = 22;
-
-const RESULT_STYLE: Record<ResultKey, { fill: RGB; text: RGB }> = {
-  none: { fill: C.fillOkHead, text: C.green },
-  minor: { fill: C.fillMinor, text: C.amber },
-  open: { fill: C.fillOpen, text: C.orange },
-  critical: { fill: C.fillNokHead, text: C.red },
-};
-const PRIO_COLOR: Record<Prio, RGB> = { K: C.red, H: C.orange, M: C.amber, N: C.ink };
-
-/** Spaltenköpfe der Matrix 2.1 (Umbruch wie im Formular) */
-const AREA_HEADS: Record<string, string> = { gaenge: 'Gänge /\nTreppen', 'xtec-werkstatt': 'xTec\nWerkstatt' };
+const MARGIN = 8;
+const INK: [number, number, number] = [38, 43, 47];
+const MUTED: [number, number, number] = [97, 105, 111];
+const LINE: [number, number, number] = [190, 196, 200];
+const GREEN: [number, number, number] = [31, 105, 65];
+const RED: [number, number, number] = [186, 35, 35];
+const PALE: [number, number, number] = [244, 246, 245];
+const SOFT_RED: [number, number, number] = [255, 242, 241];
+const PAGE_TOP = 37;
+const PAGE_BOTTOM = 15;
 
 export interface PdfInput {
   walk: Walk;
@@ -79,656 +26,364 @@ export interface PdfInput {
   photos: Photo[];
   openFromPrevious: { defect: Defect; walk?: Walk }[];
   fileBaseName: string;
+  settings: RegisterSettings;
 }
 
-const lastY = (doc: jsPDF): number =>
-  (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? TOP;
+const lastY = (doc: jsPDF): number => (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? PAGE_TOP;
+const label = (content: string) => ({ content, styles: { fontStyle: 'bold' as const, fillColor: PALE } });
 
-/** Kästchen wie ☐ / ☒ der Vorlage */
-function checkbox(doc: jsPDF, x: number, y: number, checked: boolean, color: RGB = C.ink, s = 2.8) {
-  doc.setDrawColor(...C.ink);
-  doc.setLineWidth(0.2);
-  doc.rect(x, y, s, s);
-  if (checked) {
-    doc.setDrawColor(...color);
-    doc.setLineWidth(0.45);
-    doc.line(x + 0.55, y + 0.55, x + s - 0.55, y + s - 0.55);
-    doc.line(x + s - 0.55, y + 0.55, x + 0.55, y + s - 0.55);
-    doc.setLineWidth(0.2);
-  }
-}
-
-type Sym = 'check' | 'cross' | 'dash';
-const SYM_COLOR: Record<Sym, RGB> = { check: C.green, cross: C.red, dash: C.grey };
-const RATING_SYM: Record<Rating, Sym> = { ok: 'check', mangel: 'cross', na: 'dash' };
-
-/** ✓ / ✗ / – als Vektorgrafik, (cx, cy) = Mitte, s = Kantenlänge */
-function symbol(doc: jsPDF, kind: Sym, cx: number, cy: number, s = 2.6) {
-  const h = s / 2;
-  doc.setDrawColor(...SYM_COLOR[kind]);
+function vectorMark(doc: jsPDF, kind: 'ok' | 'mangel' | 'na', cx: number, cy: number, size = 2.8) {
+  const half = size / 2;
+  doc.setLineWidth(0.55);
   doc.setLineCap('round');
   doc.setLineJoin('round');
-  if (kind === 'check') {
-    doc.setLineWidth(0.5);
-    doc.lines(
-      [
-        [h * 0.75, h * 0.75],
-        [h * 1.15, -h * 1.6],
-      ],
-      cx - h * 0.95,
-      cy + h * 0.1,
-    );
-  } else if (kind === 'cross') {
-    doc.setLineWidth(0.5);
-    doc.line(cx - h * 0.8, cy - h * 0.8, cx + h * 0.8, cy + h * 0.8);
-    doc.line(cx + h * 0.8, cy - h * 0.8, cx - h * 0.8, cy + h * 0.8);
+  doc.setDrawColor(...(kind === 'ok' ? GREEN : kind === 'mangel' ? RED : MUTED));
+  if (kind === 'ok') {
+    doc.lines([[half * 0.7, half * 0.7], [half * 1.25, -half * 1.6]], cx - half * 0.95, cy + half * 0.05);
+  } else if (kind === 'mangel') {
+    doc.line(cx - half * 0.75, cy - half * 0.75, cx + half * 0.75, cy + half * 0.75);
+    doc.line(cx + half * 0.75, cy - half * 0.75, cx - half * 0.75, cy + half * 0.75);
   } else {
-    doc.setLineWidth(0.4);
-    doc.line(cx - h * 0.7, cy, cx + h * 0.7, cy);
+    doc.line(cx - half * 0.7, cy, cx + half * 0.7, cy);
   }
   doc.setLineCap('butt');
   doc.setLineJoin('miter');
   doc.setLineWidth(0.2);
 }
 
-/** Textstück für Fliesstext mit Farben, Schnitt und gezeichneten Symbolen */
-type Seg = { t: string; color?: RGB; style?: 'normal' | 'bold' | 'italic' } | { sym: Sym };
-
-/**
- * Fliesstext mit Zeilenumbruch an Wortgrenzen. Gibt die Anzahl Zeilen zurück.
- * Mit draw = false wird nur gemessen.
- */
-function richText(doc: jsPDF, segs: Seg[], x0: number, y0: number, maxW: number, size: number, lineH: number, draw = true): number {
-  doc.setFontSize(size);
-  let x = x0;
-  let line = 0;
-  const symW = size * 0.3;
-  for (const sg of segs) {
-    if ('sym' in sg) {
-      if (x + symW > x0 + maxW && x > x0) {
-        line++;
-        x = x0;
-      }
-      if (draw) symbol(doc, sg.sym, x + symW / 2, y0 + line * lineH - size * 0.12, symW * 0.85);
-      x += symW;
-      continue;
-    }
-    doc.setFont('helvetica', sg.style ?? 'normal');
-    doc.setTextColor(...(sg.color ?? C.ink));
-    for (const tok of sg.t.split(/(\s+)/)) {
-      if (!tok) continue;
-      const w = doc.getTextWidth(tok);
-      const space = /^\s+$/.test(tok);
-      if (!space && x + w > x0 + maxW && x > x0) {
-        line++;
-        x = x0;
-      }
-      if (space && x === x0) continue;
-      if (draw) doc.text(tok, x, y0 + line * lineH);
-      x += w;
-    }
-  }
-  return line + 1;
+function checkbox(doc: jsPDF, x: number, y: number, checked: boolean, color: [number, number, number] = INK, size = 3) {
+  doc.setDrawColor(...LINE);
+  doc.rect(x, y, size, size);
+  if (!checked) return;
+  doc.setDrawColor(...color);
+  doc.setLineWidth(0.5);
+  doc.line(x + 0.5, y + 0.5, x + size - 0.5, y + size - 0.5);
+  doc.line(x + size - 0.5, y + 0.5, x + 0.5, y + size - 0.5);
+  doc.setLineWidth(0.2);
 }
 
-function fitImage(w: number, h: number, maxW: number, maxH: number) {
-  const k = Math.min(maxW / w, maxH / h);
-  return { w: w * k, h: h * k };
+function drawHeader(doc: jsPDF, walk: Walk, page: number, pageCount: number, fileBaseName: string) {
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  const logoW = 26;
+  const logoH = logoW * QPS_LOGO_RATIO;
+  const y = 10.5;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.6);
+  doc.setTextColor(25, 45, 72);
+  doc.text(`Dokumenten ID: ${SOP_META.docId}`, MARGIN, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...INK);
+  doc.text(`Dokumententitel: ${SOP_META.title}`, MARGIN, y + 4.3);
+  doc.text(`Version: ${SOP_META.version}`, MARGIN + 79, y);
+  doc.text(`Gültig ab: ${formatDate(SOP_META.validFrom)}`, MARGIN + 79, y + 4.3);
+  doc.addImage(QPS_LOGO_PNG, 'PNG', width - MARGIN - logoW, 5, logoW, logoH);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text(`Rundgang-Nr.: ${walk.docNr}`, MARGIN, y + 8.6);
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.25);
+  doc.line(MARGIN, 27, width - MARGIN, 27);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...MUTED);
+  doc.text(`${fileBaseName} · ${walk.status === 'closed' ? 'Abgeschlossen' : 'Entwurf'}`, MARGIN, height - 7);
+  doc.text(`Seite ${page} von ${pageCount}`, width - MARGIN, height - 7, { align: 'right' });
 }
 
 export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
-  const { walk, defects, photos, openFromPrevious, fileBaseName } = input;
+  const { walk, defects, photos, openFromPrevious, fileBaseName, settings } = input;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const W = doc.internal.pageSize.getWidth();
-  const H = doc.internal.pageSize.getHeight();
-  const CW = W - ML - MR;
-  doc.setProperties({
-    title: fileBaseName,
-    subject: `${SOP_META.docId} ${SOP_META.title}`,
-    author: walk.inspector,
-    creator: `${SOP_META.company}, HSE-Rundgang App`,
-  });
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  const contentWidth = width - 2 * MARGIN;
+  const photoData = new Map<string, string>();
+  for (const photo of photos) photoData.set(photo.id, await blobToDataUrl(photo.blob));
+  doc.setProperties({ title: fileBaseName, subject: `${SOP_META.docId} ${SOP_META.title}`, author: walk.inspector, creator: `${SOP_META.company}, HSE Rundgang App` });
 
-  const tableBase = {
-    margin: { left: ML, right: MR, top: TOP, bottom: BOTTOM },
-    styles: {
-      font: 'helvetica',
-      fontSize: 8.5,
-      cellPadding: 1.4,
-      textColor: C.ink,
-      lineColor: C.line,
-      lineWidth: 0.2,
-      valign: 'middle' as const,
-    },
-    headStyles: { fillColor: C.fillHead, textColor: C.ink, fontStyle: 'bold' as const },
+  const common = {
+    margin: { left: MARGIN, right: MARGIN, top: PAGE_TOP, bottom: PAGE_BOTTOM },
     theme: 'grid' as const,
+    styles: { font: 'helvetica', fontSize: 7.2, cellPadding: 1.05, textColor: INK, lineColor: LINE, lineWidth: 0.16, valign: 'middle' as const },
+    headStyles: { fillColor: PALE, textColor: INK, fontStyle: 'bold' as const, halign: 'center' as const },
   };
-  const label = (content: string) => ({ content, styles: { fontStyle: 'bold' as const, fillColor: C.fillLabel } });
-
-  let y = TOP + 2;
-  const ensure = (need: number) => {
-    if (y + need > H - BOTTOM) {
-      doc.addPage();
-      y = TOP + 2;
-    }
-  };
-  const h1 = (text: string, need = 30) => {
-    ensure(need);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(17);
-    doc.setTextColor(...C.heading);
-    doc.text(text, ML, y + 6);
-    y += 10;
-  };
-  const h3 = (text: string, need = 18) => {
-    ensure(need);
+  let y = PAGE_TOP;
+  const sectionTitle = (text: string, size = 10) => {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
-    doc.setTextColor(...C.heading);
-    doc.text(text, ML, y + 4);
-    y += 6;
+    doc.setFontSize(size);
+    doc.setTextColor(...INK);
+    doc.text(text, MARGIN, y + size * 0.35);
+    y += size * 0.72;
   };
 
-  // Titel wie Formular: "HSE Wöchentlicher Rundgang" + klein "Formular"
+  // Page 1: form title, round data, legend, 2.1 matrix and optional 2.2 table.
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(17);
+  doc.setTextColor(...INK);
+  doc.text(FORM_TITLE, MARGIN, y + 6);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(25);
-  doc.setTextColor(...C.title);
-  doc.text(SOP_META.title, ML, y + 8);
-  const tw = doc.getTextWidth(SOP_META.title);
-  doc.setFontSize(9);
-  doc.setTextColor(...C.muted);
-  doc.text('Formular', ML + tw + 2.5, y + 8);
-  y += 13;
+  doc.setFontSize(8);
+  doc.setTextColor(...MUTED);
+  doc.text(FORM_SUBTITLE, MARGIN + doc.getTextWidth(FORM_TITLE) + 2, y + 6);
+  y += 9;
+  doc.setFontSize(6.8);
+  const intro = doc.splitTextToSize(`${INTERVAL_NOTICE} ${NOT_IN_WALK_TEXT}`, contentWidth);
+  doc.text(intro, MARGIN, y + 2);
+  y += intro.length * 3.1 + 3;
 
-  // ── 1. Rundgangdaten ────────────────────────────────────────────────
-  h1('1. Rundgangdaten');
-  const openText = [...(walk.openPointsSnapshot ?? openFromPrevious.map(openPointLabel)), walk.openPointsNote]
-    .filter(Boolean)
-    .join('\n');
+  sectionTitle('1. Rundgangdaten');
+  const prevText = (walk.openDefectSnapshot ?? openFromPrevious.map(({ defect, walk: source }) => {
+    const sourceLabel = source ? `${source.docNr} ` : '';
+    return `${sourceLabel}${defect.mangelId} (${defect.itemId} / ${areaLabel(defect.area, settings.areas)}): ${defect.description} [${DEFECT_STATUS_LABELS[defect.status]}]`;
+  })).join('\n');
   autoTable(doc, {
-    ...tableBase,
+    ...common,
     startY: y,
     body: [
-      [label('Datum'), formatDate(walk.date), label('Kalenderwoche'), `KW ${walk.week} / ${walk.isoYear}`],
-      [label('Durchgeführt von'), walk.inspector, label('Uhrzeit'), walk.time],
-      [label('Begleitperson'), { content: walk.companion, colSpan: 3 }],
-      [label('Rundgangsart'), { content: '', colSpan: 3, styles: { minCellHeight: 6.5 } }],
-      [label('Offene Punkte\nVorwoche'), { content: openText || 'keine', colSpan: 3 }],
+      [label('Datum'), formatDate(walk.date), label('Kalenderwoche'), `${walk.isoYear}-KW${String(walk.week).padStart(2, '0')}`],
+      [label('Uhrzeit'), `${walk.startTime || '–'} bis ${walk.endTime || '–'}`, label('Dauer'), formatDuration(durationMinutes(walk.startTime, walk.endTime)) || '–'],
+      [label('Durchgeführt von'), walk.inspector, label('Begleitperson'), walk.companion || '–'],
+      [label('Monatspunkte'), '', label('Rundgang-Nr.'), walk.docNr],
+      [label('Offene Punkte letzter Rundgang'), { content: prevText || 'Keine offenen Mängel.', colSpan: 3 }],
     ],
-    columnStyles: { 0: { cellWidth: 29 }, 2: { cellWidth: 29 } },
-    didDrawCell: (d: CellHookData) => {
-      if (d.section !== 'body' || d.row.index !== 3 || d.column.index !== 1) return;
-      const by = d.cell.y + d.cell.height / 2 - 1.4;
-      let x = d.cell.x + 2;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(...C.ink);
-      for (const type of ['weekly', 'monthly'] as const) {
-        const text = TYPE_FORM_LABELS[type];
-        checkbox(doc, x, by, walk.type === type);
-        doc.text(text, x + 4, by + 2.3);
-        x += 4 + doc.getTextWidth(text) + 10;
-      }
-    },
-  });
-  y = lastY(doc) + 7;
-
-  // ── 2. Checkliste ───────────────────────────────────────────────────
-  h1('2. Checkliste');
-  const legend: Seg[][] = [
-    [
-      { t: 'OK', color: C.green, style: 'bold' },
-      { t: ' = in Ordnung   ' },
-      { t: 'Mangel', color: C.red, style: 'bold' },
-      { t: ' = in Kapitel 4 erfassen (Punkt + Bereich)   ' },
-      { t: 'n.a.', color: C.muted, style: 'bold' },
-      { t: ' = nicht vorhanden / nicht begangen' },
-    ],
-    [
-      { t: 'Digital: Feld anklicken und Wert wählen · Ausgedruckt: ', color: C.muted, style: 'italic' },
-      { sym: 'check' },
-      { t: ' = OK, ', color: C.muted, style: 'italic' },
-      { sym: 'cross' },
-      { t: ' = Mangel, ', color: C.muted, style: 'italic' },
-      { sym: 'dash' },
-      { t: ' = n.a.', color: C.muted, style: 'italic' },
-    ],
-  ];
-  const LEG_W = CW - 29 - 2.8;
-  const legSizes = [7.5, 6.5];
-  const legLines = legend.map((l, i) => richText(doc, l, 0, 0, LEG_W, legSizes[i], 3.2, false));
-  autoTable(doc, {
-    ...tableBase,
-    startY: y,
-    body: [[label('Bewertung'), { content: '', styles: { minCellHeight: (legLines[0] + legLines[1]) * 3.2 + 2.6 } }]],
-    columnStyles: { 0: { cellWidth: 29 } },
-    didDrawCell: (d: CellHookData) => {
-      if (d.section !== 'body' || d.column.index !== 1) return;
-      let ly = d.cell.y + 3.6;
-      legend.forEach((segs, i) => {
-        ly += (richText(doc, segs, d.cell.x + 1.4, ly, LEG_W, legSizes[i], 3.2) - 0) * 3.2;
-      });
+    columnStyles: { 0: { cellWidth: 33 }, 2: { cellWidth: 29 } },
+    didDrawCell: (cell) => {
+      if (cell.section !== 'body' || cell.row.index !== 3 || cell.column.index !== 1) return;
+      checkbox(doc, cell.cell.x + 1.6, cell.cell.y + (cell.cell.height - 3) / 2, walk.monthlyChecked, GREEN);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.2);
+      doc.setTextColor(...INK);
+      doc.text('2.2 geprüft', cell.cell.x + 6, cell.cell.y + cell.cell.height / 2 + 1.2);
     },
   });
   y = lastY(doc) + 4;
 
-  // 2.1 Matrix: Punkt x Bereich
-  h3(WEEKLY_TITLE, 40);
-  const AREA_W = 14.2;
-  const matrixHead = ['Nr.', 'Kontrollpunkt', ...AREAS.map((a) => AREA_HEADS[a.id] ?? a.label)];
-  const areaOfCol = (col: number) => AREAS[col - 2]?.id;
-  const areaCols = Object.fromEntries(AREAS.map((_, i) => [i + 2, { cellWidth: AREA_W }]));
+  sectionTitle('2. Checkliste');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.4);
+  doc.setTextColor(...MUTED);
+  const legend = doc.splitTextToSize(RATING_LEGEND, contentWidth);
+  doc.text(legend, MARGIN, y + 1.7);
+  y += legend.length * 2.9 + 2;
+
+  sectionTitle(WEEKLY_NOTICE, 8.2);
+  const head = ['Nr.', 'Kontrollpunkt', ...FORM_AREAS.map((area) => area.label)];
+  const areaColStart = 2;
+  const areaForColumn = (column: number) => FORM_AREAS[column - areaColStart];
+  const areaW = 18.5;
+  const pointCol = contentWidth - 8 - areaW * FORM_AREAS.length;
   autoTable(doc, {
-    ...tableBase,
+    ...common,
     startY: y,
     showHead: 'everyPage',
-    styles: { ...tableBase.styles, cellPadding: 0.9, fontSize: 7.8 },
-    head: [matrixHead],
-    body: WEEKLY_ITEMS.map((it) => [it.id, it.text, ...AREAS.map(() => '')]),
-    headStyles: { ...tableBase.headStyles, fontSize: 5.6, halign: 'center' },
-    columnStyles: {
-      0: { cellWidth: 9, fontStyle: 'bold', fontSize: 7, halign: 'center' },
-      ...areaCols,
-    },
-    didParseCell: (d: CellHookData) => {
-      if (d.section === 'head') {
-        if (d.column.index === 1) Object.assign(d.cell.styles, { halign: 'left', fontSize: 7.5 });
-        if (d.column.index === 0) d.cell.styles.fontSize = 6.5;
-        return;
-      }
-      const area = areaOfCol(d.column.index);
-      if (area && walk.ratings[cellKey(WEEKLY_ITEMS[d.row.index].id, area)] === 'mangel') d.cell.styles.fillColor = C.fillNok;
-    },
-    didDrawCell: (d: CellHookData) => {
-      if (d.section !== 'body') return;
-      const area = areaOfCol(d.column.index);
+    styles: { ...common.styles, fontSize: 5.8, cellPadding: 0.4, minCellHeight: 4.4 },
+    head: [head],
+    body: WEEKLY_ITEMS.map((item) => [item.id, item.text, ...FORM_AREAS.map(() => '')]),
+    headStyles: { ...common.headStyles, fontSize: 5.3 },
+    columnStyles: { 0: { cellWidth: 8, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: pointCol }, ...Object.fromEntries(FORM_AREAS.map((_, index) => [index + 2, { cellWidth: areaW, halign: 'center' }])) },
+    didParseCell: (cell) => {
+      if (cell.section !== 'body') return;
+      const area = areaForColumn(cell.column.index);
       if (!area) return;
-      const key = cellKey(WEEKLY_ITEMS[d.row.index].id, area);
-      const r = walk.ratings[key];
-      const cx = d.cell.x + d.cell.width / 2;
-      const cy = d.cell.y + d.cell.height / 2;
-      if (!r) {
+      const key = cellKey(WEEKLY_ITEMS[cell.row.index].id, area.id);
+      if (walk.ratings[key] === 'mangel') cell.cell.styles.fillColor = SOFT_RED;
+    },
+    didDrawCell: (cell) => {
+      if (cell.section !== 'body' || cell.row.index >= WEEKLY_ITEMS.length) return;
+      const area = areaForColumn(cell.column.index);
+      if (!area) return;
+      const item = WEEKLY_ITEMS[cell.row.index];
+      if (!item) return;
+      const key = cellKey(item.id, area.id);
+      const rating = walk.ratings[key];
+      const cx = cell.cell.x + cell.cell.width / 2;
+      const cy = cell.cell.y + cell.cell.height / 2;
+      if (!rating) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
-        doc.setTextColor(...C.grey);
-        doc.text('…', cx, cy + 0.6, { align: 'center' });
-        return;
-      }
-      const nrs = r === 'mangel' ? defectsForCell(key, defects).map((x) => x.nr) : [];
-      const sx = nrs.length ? cx - 2 : cx;
-      symbol(doc, RATING_SYM[r], sx, cy, 2.6);
-      if (nrs.length) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(6);
-        doc.setTextColor(...C.red);
-        doc.text(nrs.join(','), sx + 2.1, cy + 1);
+        doc.setTextColor(...MUTED);
+        doc.text('…', cx, cy + 1, { align: 'center' });
+      } else {
+        vectorMark(doc, rating, cx, cy, 2.8);
+        const linked = defects.filter((defect) => defect.itemId === item.id && defect.area === area.id);
+        if (linked.length) {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(5.5);
+          doc.setTextColor(...RED);
+          doc.text(linked.map((defect) => String(defect.nr)).join(','), cx + 1.8, cy + 1.7);
+        }
       }
     },
   });
-  y = lastY(doc) + 5;
+  y = lastY(doc) + 3;
 
-  // 2.2 Monatlich
-  if (walk.type === 'monthly') {
-    h3(MONTHLY_TITLE, 60);
-    const ratingCols = { 2: 'ok', 3: 'mangel', 4: 'na' } as const;
-    const areasText = (itemId: string) =>
-      defectsForCell(itemId, defects)
-        .map((x) => `${areaLabel(x.area)} (Nr. ${x.nr})`)
-        .join('\n');
+  if (walk.monthlyChecked) {
+    sectionTitle(MONTHLY_NOTICE, 8.2);
+    const monthlyHead = ['Nr.', 'Kontrollpunkt', 'OK', 'Mangel', 'n.a.', 'Bereich'];
     autoTable(doc, {
-      ...tableBase,
+      ...common,
       startY: y,
       showHead: 'everyPage',
-      styles: { ...tableBase.styles, cellPadding: 0.9, fontSize: 7.8 },
-      head: [['Nr.', 'Kontrollpunkt', 'OK', 'Mangel', 'n.a.', 'Bereich']],
-      body: MONTHLY_ITEMS.map((it) => [it.id, it.text, '', '', '', areasText(it.id)]),
-      headStyles: { ...tableBase.headStyles, fontSize: 6.5, halign: 'center' },
-      columnStyles: {
-        0: { cellWidth: 9, fontStyle: 'bold', fontSize: 7, halign: 'center' },
-        2: { cellWidth: 10 },
-        3: { cellWidth: 11.5 },
-        4: { cellWidth: 10 },
-        5: { cellWidth: 40, fontSize: 6.5 },
-      },
-      didParseCell: (d: CellHookData) => {
-        if (d.section !== 'head') return;
-        const i = d.column.index;
-        if (i === 1) Object.assign(d.cell.styles, { halign: 'left', fontSize: 7.5 });
-        if (i === 2) Object.assign(d.cell.styles, { fillColor: C.fillOkHead, textColor: C.green });
-        if (i === 3) Object.assign(d.cell.styles, { fillColor: C.fillNokHead, textColor: C.red });
-        if (i === 4) Object.assign(d.cell.styles, { fillColor: C.fillLabel, textColor: C.muted, fontStyle: 'normal' });
-      },
-      didDrawCell: (d: CellHookData) => {
-        if (d.section !== 'body' || !(d.column.index in ratingCols)) return;
-        const key = ratingCols[d.column.index as 2 | 3 | 4];
-        const color = key === 'ok' ? C.green : key === 'mangel' ? C.red : C.muted;
-        const id = MONTHLY_ITEMS[d.row.index].id;
-        checkbox(doc, d.cell.x + d.cell.width / 2 - 1.4, d.cell.y + d.cell.height / 2 - 1.4, walk.ratings[id] === key, color);
+      styles: { ...common.styles, fontSize: 6, cellPadding: 0.4, minCellHeight: 4.5 },
+      head: [monthlyHead],
+      body: MONTHLY_ITEMS.map((item) => [item.id, item.text, '', '', '', walk.monthlyAreas[item.id] ?? '']),
+      columnStyles: { 0: { cellWidth: 8, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: contentWidth - 8 - 9 * 3 - 38 }, 2: { cellWidth: 9 }, 3: { cellWidth: 9 }, 4: { cellWidth: 9 }, 5: { cellWidth: 38 } },
+      didDrawCell: (cell) => {
+        if (cell.section !== 'body' || cell.row.index >= MONTHLY_ITEMS.length || cell.column.index < 2 || cell.column.index > 4) return;
+        const item = MONTHLY_ITEMS[cell.row.index];
+        if (!item) return;
+        const kind = (['ok', 'mangel', 'na'] as const)[cell.column.index - 2];
+        const rating = walk.ratings[item.id];
+        if (rating === kind) vectorMark(doc, kind, cell.cell.x + cell.cell.width / 2, cell.cell.y + cell.cell.height / 2, 2.7);
       },
     });
-    y = lastY(doc) + 7;
+    y = lastY(doc) + 3;
   } else {
-    h3(MONTHLY_TITLE, 12);
     doc.setFont('helvetica', 'italic');
-    doc.setFontSize(7.5);
-    doc.setTextColor(...C.muted);
-    doc.text(`Entfällt: ${TYPE_FORM_LABELS.weekly}.`, ML, y + 1.5);
-    y += 9;
+    doc.setFontSize(7);
+    doc.setTextColor(...MUTED);
+    doc.text(`${MONTHLY_NOTICE}: nicht geprüft.`, MARGIN, y + 2);
+    y += 5;
   }
-
-  // ── 3. Ergebnis und Abschluss ───────────────────────────────────────
-  h1('3. Ergebnis und Abschluss', 66); // Kapitel 3 nicht trennen (Zähler, Ergebnis, Unterschriften)
-  const dc = defectCounts(defects);
-  autoTable(doc, {
-    ...tableBase,
-    startY: y,
-    body: [
-      [
-        label('Anzahl Mängel'),
-        { content: String(dc.total), styles: { halign: 'center' } },
-        { content: 'davon kritisch (K)', styles: { fontStyle: 'bold', fillColor: C.fillLabel, textColor: C.red } },
-        { content: String(dc.critical), styles: { halign: 'center', textColor: dc.critical ? C.red : C.ink, fontStyle: dc.critical ? 'bold' : 'normal' } },
-      ],
-    ],
-  });
-  y = lastY(doc) + 3;
-  const resultKeys = Object.keys(RESULT_LABELS) as ResultKey[];
-  autoTable(doc, {
-    ...tableBase,
-    startY: y,
-    body: [resultKeys.map((k) => `       ${RESULT_LABELS[k]}`)],
-    styles: { ...tableBase.styles, fontSize: 7.5, fontStyle: 'bold', minCellHeight: 6.5 },
-    didParseCell: (d: CellHookData) => {
-      const st = RESULT_STYLE[resultKeys[d.column.index]];
-      Object.assign(d.cell.styles, { fillColor: st.fill, textColor: st.text });
-    },
-    didDrawCell: (d: CellHookData) => {
-      const k = resultKeys[d.column.index];
-      checkbox(doc, d.cell.x + 1.6, d.cell.y + d.cell.height / 2 - 1.4, walk.result === k, RESULT_STYLE[k].text);
-    },
-  });
-  y = lastY(doc) + 3;
-  autoTable(doc, {
-    ...tableBase,
-    startY: y,
-    body: [['', '']],
-    styles: { ...tableBase.styles, minCellHeight: 26, valign: 'top' },
-    didDrawCell: (d: CellHookData) => {
-      const s = d.column.index === 0 ? walk.signature : walk.acknowledgement;
-      const x = d.cell.x + 2;
-      const top = d.cell.y;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(...C.ink);
-      doc.text(d.column.index === 0 ? 'Durchführende/r' : 'Kenntnisnahme (optional)', x, top + 4.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(...C.muted);
-      doc.text(`Name: `, x, top + 9.5);
-      doc.text(`Datum: `, x + d.cell.width / 2, top + 9.5);
-      doc.setTextColor(...C.ink);
-      doc.text(s.name || '', x + 10, top + 9.5);
-      doc.text(s.date ? formatDate(s.date) : '', x + d.cell.width / 2 + 11, top + 9.5);
-      doc.setFontSize(7);
-      doc.setTextColor(...C.muted);
-      doc.text('Unterschrift:', x, top + 23.5);
-      doc.setDrawColor(...C.line);
-      doc.line(x + 15, top + 23.8, d.cell.x + d.cell.width - 3, top + 23.8);
-      if (s.image) doc.addImage(s.image, 'PNG', x + 18, top + 11.5, 40, 12);
-    },
-  });
-  y = lastY(doc) + 7;
-
-  // ── 4. Mängel und Massnahmen ────────────────────────────────────────
-  const photosOf = (id: string) => photos.filter((p) => p.defectId === id);
-  const photoUrls = new Map<string, string>();
-  for (const p of photos) photoUrls.set(p.id, await blobToDataUrl(p.blob));
-
-  ensure(60);
-  h1('4. Mängel und Massnahmen');
-  const prioSegs: Seg[] = [
-    { t: 'Prio: ', style: 'bold' },
-    { t: 'K', color: C.red, style: 'bold' },
-    { t: ' sofort · ' },
-    { t: 'H', color: C.orange, style: 'bold' },
-    { t: ' 48 Std. · ' },
-    { t: 'M', color: C.amber, style: 'bold' },
-    { t: ' 1 Woche · ' },
-    { t: 'N', style: 'bold' },
-    { t: ' 1 Monat (Richtwerte) · weitere Mängel: Zeile kopieren · Nachkontrolle im Excel-Register' },
-  ];
-  y += 3.2 * richText(doc, prioSegs, ML, y, CW, 7, 3.2) - 0.5;
-
-  const PHOTO_W = 44;
-  const PHOTO_H = 31;
-  const defectBody: RowInput[] = defects.length
-    ? defects.map((d) => {
-        const extra = photosOf(d.id).length - 1;
-        const status =
-          d.status === 'done' ? `\nStatus: erledigt ${formatDate(d.doneAt)}${d.doneNote ? `, ${d.doneNote}` : ''}` : '\nStatus: offen';
-        return [
-          '',
-          d.hazard || '–',
-          `${d.action || '–'}${status}`,
-          `${d.responsible || '–'}\n${formatDate(d.due)}\n`,
-          extra > 0 ? `\n\n\n\n\n\n\n+${extra} weitere(s) Foto(s) im Anhang` : '',
-        ];
-      })
-    : [[{ content: 'Keine Mängel erfasst.', colSpan: 5, styles: { textColor: C.muted } }]];
-  autoTable(doc, {
-    ...tableBase,
-    startY: y,
-    showHead: 'everyPage',
-    head: [['Nr. / Pkt. / Bereich', 'Mangel / Gefahr', 'Massnahme', 'Verantw. / Frist / Prio', 'Foto']],
-    headStyles: { ...tableBase.headStyles, fontSize: 7.5, halign: 'center' },
-    body: defectBody,
-    rowPageBreak: 'avoid',
-    styles: { ...tableBase.styles, valign: 'top', fontSize: 8 },
-    columnStyles: {
-      0: { cellWidth: 21 },
-      1: { cellWidth: (CW - 21 - 26 - PHOTO_W - 3) / 2 },
-      2: { cellWidth: (CW - 21 - 26 - PHOTO_W - 3) / 2 },
-      3: { cellWidth: 26, fontSize: 7.5 },
-      4: { cellWidth: PHOTO_W + 3, fontSize: 6, textColor: C.muted, halign: 'center' },
-    },
-    didParseCell: (d: CellHookData) => {
-      if (d.section === 'body' && defects.length) d.cell.styles.minCellHeight = PHOTO_H + 3;
-      if (d.section === 'head' && (d.column.index === 0 || d.column.index === 3)) d.cell.styles.fontSize = 6;
-    },
-    didDrawCell: (d: CellHookData) => {
-      if (d.section !== 'body' || !defects.length) return;
-      const def = defects[d.row.index];
-      if (!def) return;
-      const x = d.cell.x;
-      const top = d.cell.y;
-      if (d.column.index === 0) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(...C.ink);
-        doc.text(String(def.nr), x + 1.5, top + 5.5);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6.5);
-        doc.setTextColor(...C.muted);
-        doc.text('Pkt.', x + 1.5, top + 10);
-        doc.text('Bereich', x + 1.5, top + 17.5);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...C.ink);
-        doc.setFontSize(8);
-        doc.text(def.itemId, x + 1.5, top + 13.5);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.text(doc.splitTextToSize(areaLabel(def.area), d.cell.width - 2.5), x + 1.5, top + 21);
-      }
-      if (d.column.index === 3) {
-        let bx = x + 1.4;
-        const by = top + 12;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(6.5);
-        for (const p of Object.keys(PRIO) as Prio[]) {
-          checkbox(doc, bx, by, def.prio === p, PRIO_COLOR[p], 2.5);
-          doc.setTextColor(...PRIO_COLOR[p]);
-          doc.text(p, bx + 2.9, by + 2.1);
-          bx += 6;
-        }
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6);
-        doc.setTextColor(...C.muted);
-        doc.text(PRIO[def.prio].hint, x + 1.4, by + 5.6);
-      }
-      if (d.column.index === 4) {
-        const first = photosOf(def.id)[0];
-        const url = first && photoUrls.get(first.id);
-        if (first && url) {
-          const f = fitImage(first.width, first.height, PHOTO_W, PHOTO_H);
-          doc.addImage(url, 'JPEG', x + (d.cell.width - f.w) / 2, top + 1.5, f.w, f.h, undefined, 'FAST');
-        } else {
-          doc.setFontSize(6.5);
-          doc.setTextColor(...C.muted);
-          doc.text('kein Foto', x + d.cell.width / 2, top + PHOTO_H / 2 + 2, { align: 'center' });
-        }
-      }
-    },
-  });
-  y = lastY(doc) + 6;
-
-  // Weitere Fotos (ab dem zweiten Foto je Mangel)
-  const colW = (CW - 6) / 2;
-  for (const d of defects) {
-    const ps = photosOf(d.id).slice(1);
-    if (!ps.length) continue;
-    ensure(50);
-    h3(`Weitere Fotos zu Mangel Nr. ${d.nr} (${d.itemId} / ${areaLabel(d.area)})`);
-    let col = 0;
-    let rowH = 0;
-    for (const p of ps) {
-      const f = fitImage(p.width, p.height, colW, 80);
-      if (y + f.h > H - BOTTOM) {
-        doc.addPage();
-        y = TOP + 2;
-        col = 0;
-        rowH = 0;
-      }
-      const url = photoUrls.get(p.id);
-      if (url) doc.addImage(url, 'JPEG', ML + col * (colW + 6), y, f.w, f.h, undefined, 'FAST');
-      rowH = Math.max(rowH, f.h);
-      if (++col === 2) {
-        col = 0;
-        y += rowH + 4;
-        rowH = 0;
-      }
-    }
-    if (col !== 0) y += rowH + 4;
-    y += 2;
-  }
-
-  // ── 5. Hinweise und Dokumentenlenkung ───────────────────────────────
-  ensure(150);
-  h1('5. Hinweise und Dokumentenlenkung');
-  autoTable(doc, {
-    ...tableBase,
-    startY: y,
-    styles: { ...tableBase.styles, fontSize: 7.5, valign: 'top' },
-    body: [
-      [label('Ablauf'), PROCEDURE_TEXT.join('\n')],
-      [label('Nicht im Rundgang'), NOT_IN_WALK_TEXT],
-    ],
-    columnStyles: { 0: { cellWidth: 29 } },
-  });
-  y = lastY(doc) + 4;
-  h3('Grundlagen je Kontrollpunkt', 50);
-  autoTable(doc, {
-    ...tableBase,
-    startY: y,
-    styles: { ...tableBase.styles, fontSize: 6.5, cellPadding: 1.1 },
-    body: LEGAL_BASES.map((l) => [l.points, l.text]),
-    columnStyles: { 0: { cellWidth: 29, fontStyle: 'bold', fillColor: C.fillLabel } },
-  });
-  y = lastY(doc) + 1;
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(6.5);
-  doc.setTextColor(...C.muted);
-  const foot = doc.splitTextToSize(LEGAL_FOOTNOTE, CW);
-  doc.text(foot, ML, y + 2.6);
-  y += foot.length * 2.8 + 4;
-
-  const lined = {
-    ...tableBase,
-    theme: 'plain' as const,
-    styles: { ...tableBase.styles, fontSize: 9, lineWidth: 0 },
-    headStyles: { fillColor: C.fillHead, textColor: C.ink, fontStyle: 'bold' as const },
-    didDrawCell: (d: CellHookData) => {
-      doc.setDrawColor(...C.ink);
-      doc.setLineWidth(d.section === 'head' ? 0.6 : 0.3);
-      doc.line(d.cell.x, d.cell.y + d.cell.height, d.cell.x + d.cell.width, d.cell.y + d.cell.height);
-      if (d.section === 'head' && d.row.index === 0) doc.line(d.cell.x, d.cell.y, d.cell.x + d.cell.width, d.cell.y);
-      if (d.column.index > 0) {
-        doc.setLineWidth(0.2);
-        doc.line(d.cell.x, d.cell.y, d.cell.x, d.cell.y + d.cell.height);
-      }
-    },
-  };
-  h3('Genehmigung', 30);
-  autoTable(doc, {
-    ...lined,
-    startY: y,
-    head: [['Name', 'Position', 'Unterschrift/Datum']],
-    headStyles: { ...lined.headStyles, halign: 'center' },
-    body: [...APPROVAL.map((a) => [a.name, a.position, '']), ['', '', '']],
-  });
-  y = lastY(doc) + 5;
-  h3('Änderungsverzeichnis', 20);
-  autoTable(doc, {
-    ...lined,
-    startY: y,
-    head: [['Versionsnummer', 'Beschreibung']],
-    body: CHANGE_LOG.map((c) => [c.version, c.description]),
-    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 37 } },
-  });
-
-  // ── Kopf- und Fusszeile auf jeder Seite (wie Vorlage) ───────────────
-  const pages = doc.getNumberOfPages();
-  const logoW = 28.3;
-  const logoH = logoW * QPS_LOGO_RATIO;
-  const footLeft = `${fileBaseName} · ${walk.status === 'closed' ? 'abgeschlossen' : 'Entwurf'}`;
-  for (let i = 1; i <= pages; i++) {
-    doc.setPage(i);
-    const hy = 12.5;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(...C.ink);
-    doc.text('Dokumenten ID: ', ML, hy);
-    doc.setTextColor(...C.docId);
-    doc.text(SOP_META.docId, ML + doc.getTextWidth('Dokumenten ID: '), hy);
-    doc.setTextColor(...C.ink);
-    doc.text(`Dokumententitel: ${SOP_META.title}`, ML, hy + 3.8);
-    const vx = ML + 72;
-    doc.text(`Version: ${SOP_META.version}`, vx, hy);
-    doc.text(`Gültig ab: ${formatDate(SOP_META.validFrom)}`, vx, hy + 3.8);
-    doc.addImage(QPS_LOGO_PNG, 'PNG', W - MR - logoW + 4, 6, logoW, logoH);
-
-    doc.setFont('times', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(...C.ink);
-    const parts: [string, 'normal' | 'bold'][] = [
-      ['Seite ', 'normal'],
-      [String(i), 'bold'],
-      [' von ', 'normal'],
-      [String(pages), 'bold'],
-    ];
-    let total = 0;
-    for (const [t, st] of parts) {
-      doc.setFont('times', st);
-      total += doc.getTextWidth(t);
-    }
-    let fx = W / 2 - total / 2;
-    for (const [t, st] of parts) {
-      doc.setFont('times', st);
-      doc.text(t, fx, H - 10);
-      fx += doc.getTextWidth(t);
-    }
+  if (walk.note) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
-    doc.setTextColor(...C.muted);
-    doc.text(footLeft, ML, H - 10);
+    doc.setTextColor(...MUTED);
+    doc.text(doc.splitTextToSize(`Bemerkung: ${walk.note}`, contentWidth), MARGIN, Math.min(y + 2, height - PAGE_BOTTOM - 2));
   }
+
+  // Page 2: defects and close block. The register may create continuation pages when needed.
+  doc.addPage();
+  y = PAGE_TOP;
+  sectionTitle('3. Mängel und Massnahmen');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...MUTED);
+  doc.text(doc.splitTextToSize(PRIORITY_NOTE, contentWidth), MARGIN, y + 1.4);
+  y += 5;
+  const photosFor = (defectId: string) => photos.filter((photo) => photo.defectId === defectId);
+  const photoSize = { width: 37, height: 28 };
+  const defectRows: RowInput[] = defects.length ? defects.map((defect) => [
+    '',
+    `${defect.description}${defect.hazard ? `\nGefahr: ${defect.hazard}` : ''}`,
+    `${defect.immediateAction ? `Sofortmassnahme: ${defect.immediateAction}\n` : ''}${defect.action || ''}`,
+    `${defect.responsible || '–'}\n${PRIORITY_KEY_TO_TEXT[defect.priority]}\n${formatDate(validDefectDue(walk.date, defect, settings))}`,
+    '',
+  ]) : [[{ content: 'Keine Mängel erfasst.', colSpan: 5, styles: { textColor: MUTED } }]];
+  autoTable(doc, {
+    ...common,
+    startY: y,
+    head: [['Nr. / Pkt. / Bereich', 'Beschreibung / Gefahr', 'Sofortmassnahme / Massnahme', 'Verantwortlich / Frist / Prio', 'Foto']],
+    body: defectRows,
+    rowPageBreak: 'avoid',
+    styles: { ...common.styles, valign: 'top', fontSize: 6.8, minCellHeight: photoSize.height + 3 },
+    headStyles: { ...common.headStyles, fontSize: 6.4 },
+    columnStyles: { 0: { cellWidth: 29 }, 1: { cellWidth: 51 }, 2: { cellWidth: 47 }, 3: { cellWidth: 37 }, 4: { cellWidth: contentWidth - 164, halign: 'center' } },
+    didDrawCell: (cell) => {
+      if (cell.section !== 'body' || defects.length === 0) return;
+      const defect = defects[cell.row.index];
+      if (!defect) return;
+      if (cell.column.index === 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.setTextColor(...INK);
+        doc.text(String(defect.nr), cell.cell.x + 1.5, cell.cell.y + 4.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(5.8);
+        doc.setTextColor(...MUTED);
+        doc.text(`Mangel-ID: ${defect.mangelId}`, cell.cell.x + 1.5, cell.cell.y + 8);
+        doc.text(`Pkt.: ${defect.itemId}`, cell.cell.x + 1.5, cell.cell.y + 12);
+        const area = areaLabel(defect.area, settings.areas);
+        doc.text(doc.splitTextToSize(`Bereich: ${area}`, cell.cell.width - 3), cell.cell.x + 1.5, cell.cell.y + 16);
+      }
+      if (cell.column.index === 4) {
+        const firstPhoto = photosFor(defect.id)[0];
+        const url = firstPhoto && photoData.get(firstPhoto.id);
+        if (firstPhoto && url) {
+          const scale = Math.min(photoSize.width / firstPhoto.width, photoSize.height / firstPhoto.height);
+          const imageWidth = firstPhoto.width * scale;
+          const imageHeight = firstPhoto.height * scale;
+          doc.addImage(url, 'JPEG', cell.cell.x + (cell.cell.width - imageWidth) / 2, cell.cell.y + 1, imageWidth, imageHeight, undefined, 'FAST');
+        } else {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          doc.setTextColor(...MUTED);
+          doc.text('kein Foto', cell.cell.x + cell.cell.width / 2, cell.cell.y + cell.cell.height / 2, { align: 'center' });
+        }
+      }
+    },
+  });
+  y = lastY(doc) + 4;
+
+  for (const defect of defects) {
+    const additional = photosFor(defect.id).slice(1);
+    for (const [index, photo] of additional.entries()) {
+      const imageW = Math.min(contentWidth / 2 - 4, 70);
+      const scale = Math.min(imageW / photo.width, 50 / photo.height);
+      const imageWidth = photo.width * scale;
+      const imageHeight = photo.height * scale;
+      if (y + imageHeight + 12 > height - PAGE_BOTTOM) {
+        doc.addPage();
+        y = PAGE_TOP;
+      }
+      if (index === 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(...INK);
+        doc.text(`Weitere Fotos zu ${defect.mangelId}`, MARGIN, y + 2);
+        y += 5;
+      }
+      const url = photoData.get(photo.id);
+      if (url) doc.addImage(url, 'JPEG', MARGIN, y, imageWidth, imageHeight, undefined, 'FAST');
+      y += imageHeight + 3;
+    }
+  }
+
+  if (y + 55 > height - PAGE_BOTTOM) {
+    doc.addPage();
+    y = PAGE_TOP;
+  }
+  y += 2;
+  sectionTitle('4. Abschluss');
+  const resultKeys = Object.keys(RESULT_LABELS) as ResultKey[];
+  autoTable(doc, {
+    ...common,
+    startY: y,
+    body: [resultKeys.map((key) => `     ${RESULT_LABELS[key]}`)],
+    styles: { ...common.styles, fontSize: 7, fontStyle: 'bold', minCellHeight: 8 },
+    didDrawCell: (cell) => {
+      const key = resultKeys[cell.column.index];
+      if (key) checkbox(doc, cell.cell.x + 1.5, cell.cell.y + (cell.cell.height - 3) / 2, walk.result === key, GREEN);
+    },
+  });
+  y = lastY(doc) + 3;
+  autoTable(doc, {
+    ...common,
+    startY: y,
+    body: [['', '']],
+    styles: { ...common.styles, minCellHeight: 29, valign: 'top' },
+    didDrawCell: (cell: CellHookData) => {
+      const signature = cell.column.index === 0 ? walk.signature : walk.acknowledgement;
+      const x = cell.cell.x + 2;
+      const top = cell.cell.y;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(...INK);
+      doc.text(cell.column.index === 0 ? 'Durchführende/r' : 'Kenntnisnahme (optional)', x, top + 4);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.text(`Name: ${signature.name || ''}`, x, top + 9);
+      doc.text(`Datum: ${signature.date ? formatDate(signature.date) : ''}`, x, top + 14);
+      doc.text('Unterschrift:', x, top + 20);
+      doc.setDrawColor(...LINE);
+      doc.line(x + 17, top + 20, cell.cell.x + cell.cell.width - 3, top + 20);
+      if (signature.image) doc.addImage(signature.image, 'PNG', x + 20, top + 10, 35, 10);
+    },
+  });
+
+  // Repeat document-control header, logo, separate walk ID and page footer on every page.
+  const pageCount = doc.getNumberOfPages();
+  for (let page = 1; page <= pageCount; page++) drawHeader(doc, walk, page, pageCount, fileBaseName);
   return doc;
 }
