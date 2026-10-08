@@ -2,13 +2,12 @@ import ExcelJS from 'exceljs';
 import { areaLabel } from '../data/checklist';
 import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../data/register';
 import { isoWeek } from './dates';
-import { defectDaysOpen, deriveInspection, roundRegisterRows, validDefectDue } from './register';
-import type { Defect, Inspection, RegisterSettings, Walk } from './types';
+import { defectDaysOpen, roundRegisterRows, validDefectDue } from './register';
+import type { Defect, RegisterSettings, Walk } from './types';
 
 export interface RegisterWorkbookInput {
   walks: Walk[];
   defects: Defect[];
-  inspections: Inspection[];
   settings: RegisterSettings;
 }
 
@@ -50,7 +49,7 @@ function excelTime(value: string): number | '' {
 }
 
 export async function buildRegisterWorkbook(input: RegisterWorkbookInput): Promise<Uint8Array> {
-  const { walks, defects, inspections, settings } = input;
+  const { walks, defects, settings } = input;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'HSE Rundgang App';
   workbook.subject = 'Registerdaten aus dem HSE Rundgang';
@@ -136,29 +135,6 @@ export async function buildRegisterWorkbook(input: RegisterWorkbookInput): Promi
     if (overdue) row.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4E4' } }; });
     if (defect.priority === 'K') row.getCell(9).font = { bold: true, color: { argb: 'FFC00000' } };
   }
-
-  const inspectionSheet = workbook.addWorksheet('Prüftermine');
-  setSheetHeader(inspectionSheet, ['Nr.', 'Prüfung', 'Bereich', 'Intervall (Monate)', 'Letzte Prüfung', 'Nächste Fälligkeit', 'Status', 'Verantwortlich', 'Nachweis / Ablage', 'Bemerkung'], [8, 58, 28, 20, 16, 18, 22, 24, 38, 42]);
-  inspections.forEach((inspection, index) => {
-    const derived = deriveInspection(inspection);
-    const row = inspectionSheet.addRow([
-      index + 1,
-      inspection.description,
-      inspection.area,
-      inspection.intervalMonths ?? '',
-      excelDate(inspection.lastInspection),
-      excelDate(derived.nextDue),
-      derived.status,
-      inspection.responsible,
-      inspection.evidence,
-      inspection.note,
-    ]);
-    styleDataRow(row);
-    row.getCell(5).numFmt = 'dd.mm.yyyy';
-    row.getCell(6).numFmt = 'dd.mm.yyyy';
-    if (derived.status === 'überfällig') row.getCell(7).font = { bold: true, color: { argb: 'FFC00000' } };
-    if (derived.status === 'bald fällig') row.getCell(7).font = { bold: true, color: { argb: 'FFB45309' } };
-  });
 
   const buffer = await workbook.xlsx.writeBuffer();
   return new Uint8Array(buffer as ArrayBuffer);

@@ -14,9 +14,8 @@ export function DashboardPage() {
   const [creating, setCreating] = useState(false);
   const walks = useLiveQuery(() => db.walks.toArray());
   const defects = useLiveQuery(() => db.defects.toArray());
-  const inspections = useLiveQuery(() => db.inspections.toArray());
-  const dataReady = !!walks && !!defects && !!inspections;
-  const metrics = dataReady ? overviewMetrics(walks, defects, inspections, settings) : null;
+  const dataReady = !!walks && !!defects;
+  const metrics = dataReady ? overviewMetrics(walks, defects, settings) : null;
   const recentRounds = dataReady ? roundRegisterRows(walks, defects, settings).slice().reverse().slice(0, 8) : [];
 
   const start = async () => {
@@ -34,7 +33,7 @@ export function DashboardPage() {
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Übersicht</h1>
-          <p className="mt-1 text-sm text-muted">Rundgänge, Mängel und periodische Prüftermine.</p>
+          <p className="mt-1 text-sm text-muted">Rundgänge und Mängel.</p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <Link to="/register" className="btn-secondary flex-1 sm:flex-none">Register öffnen</Link>
@@ -99,11 +98,7 @@ export function DashboardPage() {
             </div>
           </section>
 
-          <section className="grid gap-4 sm:grid-cols-2">
-            <Link to="/register?view=prueftermine" className="rounded-xl border border-line bg-surface p-4 hover:bg-surface-2">
-              <h2 className="font-semibold">Prüftermine</h2>
-              <p className="mt-1 text-sm text-muted">{metrics.inspectionsOverdue} überfällig · {metrics.inspectionsSoon} bald fällig · {metrics.inspectionsMissing} ohne vollständige Angaben</p>
-            </Link>
+          <section>
             <div className="rounded-xl border border-line bg-surface p-4">
               <h2 className="font-semibold">Monatspunkte</h2>
               <p className="mt-1 text-sm text-muted">{metrics.monthlyCheckedThisMonth ? '2.2 wurde diesen Monat geprüft.' : '2.2 wurde diesen Monat noch nicht als geprüft erfasst.'}</p>

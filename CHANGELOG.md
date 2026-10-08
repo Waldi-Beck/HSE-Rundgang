@@ -4,9 +4,10 @@
 
 - Aktuelles Formular aus der bereitgestellten DOTX: R1-R15 in fünf Räumen, optionale Monatspunkte M1-M9, Beginn/Ende/Dauer, Monatsprüfungskennzeichen und automatische Übernahme offener Mängel.
 - Mängelerfassung mit Mangel-ID, Beschreibung/Gefahr, Sofortmassnahme, Massnahme, Verantwortlich, Priorität/Richtfrist, Foto sowie Register-Nachkontrolle.
-- Neues Übersichtsblatt und drei Registeransichten (Rundgänge, Mängel, Prüftermine), einschliesslich 15 Excel-Prüfterminvorschlägen und konfigurierbaren Listenwerten.
-- XLSX-Export mit Registerspalten; JSON-Backup auf Formatversion 4 erweitert.
+- Neues Übersichtsblatt und Registeransichten für Rundgänge und Mängel mit konfigurierbaren Listenwerten.
+- XLSX-Export mit Rundgang- und Mängelspalten; JSON-Backup auf Formatversion 4 erweitert.
 - PDF-Layout an die neue Formularvorlage angepasst. Dokumenten-ID QPS_HSE_00064, Version 1.0 und Gültig ab 05.10.2026 bleiben unverändert.
+- Prüftermine aus App-Register und XLSX-Export entfernt; periodische Geräteprüfungen bleiben im separaten Excel-Register.
 
 ## 2026-10-08: Formular-Revision QPS_HSE_00064 (Matrix je Bereich)
 

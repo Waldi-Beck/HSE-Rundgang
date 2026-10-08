@@ -89,16 +89,12 @@ export interface OverviewMetrics {
   doneCount: number;
   defectsByArea: { area: string; total: number; open: number; done: number; overdue: number }[];
   defectsByPriority: { priority: Defect['priority']; label: string; total: number; open: number }[];
-  inspectionsOverdue: number;
-  inspectionsSoon: number;
-  inspectionsMissing: number;
   roundWarning: boolean;
 }
 
 export function overviewMetrics(
   walks: Walk[],
   defects: Defect[],
-  inspections: Inspection[],
   settings: RegisterSettings,
   today = toISODate(new Date()),
 ): OverviewMetrics {
@@ -125,7 +121,6 @@ export function overviewMetrics(
     const withPriority = defects.filter((defect) => defect.priority === priority);
     return { priority, label: PRIORITY_KEY_TO_TEXT[priority], total: withPriority.length, open: withPriority.filter((defect) => defect.status !== 'done').length };
   });
-  const derivedInspections = inspections.map((inspection) => deriveInspection(inspection, today));
   return {
     walkCount: walks.length,
     lastWalk,
@@ -141,9 +136,6 @@ export function overviewMetrics(
     doneCount: defects.filter((defect) => defect.status === 'done').length,
     defectsByArea,
     defectsByPriority,
-    inspectionsOverdue: derivedInspections.filter((item) => item.status === 'überfällig').length,
-    inspectionsSoon: derivedInspections.filter((item) => item.status === 'bald fällig').length,
-    inspectionsMissing: derivedInspections.filter((item) => item.status === 'Datum fehlt' || item.status === 'Intervall fehlt').length,
     roundWarning: !!lastWalk && daysSinceLastWalk !== null && daysSinceLastWalk > settings.maxIntervalDays,
   };
 }

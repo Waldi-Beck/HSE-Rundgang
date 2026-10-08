@@ -1,20 +1,19 @@
-import { DownloadSimple, Plus } from '@phosphor-icons/react';
+import { DownloadSimple } from '@phosphor-icons/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../data/register';
-import { db, saveInspection, updateDefect } from '../db';
+import { db, updateDefect } from '../db';
 import { exportRegisterXlsx } from '../export';
 import { formatDate, toISODate } from '../lib/dates';
-import { defectDaysOpen, deriveInspection, roundRegisterRows, validDefectDue } from '../lib/register';
-import type { Defect, DefectStatus, Inspection, Walk } from '../lib/types';
+import { defectDaysOpen, roundRegisterRows, validDefectDue } from '../lib/register';
+import type { Defect, DefectStatus, Walk } from '../lib/types';
 import { EmptyState, useToast } from '../components/ui';
 import { useRegisterSettings } from '../components/SettingsContext';
 
 const VIEWS = [
   { id: 'rundgaenge', label: 'Rundgänge' },
   { id: 'maengel', label: 'Mängel' },
-  { id: 'prueftermine', label: 'Prüftermine' },
 ] as const;
 type ViewId = (typeof VIEWS)[number]['id'];
 
@@ -26,8 +25,7 @@ export function RegisterPage() {
   const settings = useRegisterSettings();
   const walks = useLiveQuery(() => db.walks.toArray());
   const defects = useLiveQuery(() => db.defects.toArray());
-  const inspections = useLiveQuery(() => db.inspections.toArray());
-  const ready = !!walks && !!defects && !!inspections;
+  const ready = !!walks && !!defects;
   const rows = ready ? roundRegisterRows(walks, defects, settings).slice().reverse() : [];
 
   useEffect(() => {
@@ -43,15 +41,15 @@ export function RegisterPage() {
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="text-2xl font-semibold tracking-tight">Register</h1><p className="mt-1 text-sm text-muted">Rundgänge, Mängel und periodische Prüfungen.</p></div>
+        <div><h1 className="text-2xl font-semibold tracking-tight">Register</h1><p className="mt-1 text-sm text-muted">Rundgänge und Mängel.</p></div>
         <div className="flex gap-2"><Link to="/einstellungen" className="btn-secondary">Einstellungen</Link><button type="button" className="btn-primary" onClick={() => void downloadXlsx()}><DownloadSimple size={18} aria-hidden /> Excel exportieren</button></div>
       </header>
 
-      <div role="tablist" aria-label="Registerblätter" className="grid grid-cols-3 gap-1 rounded-lg border border-line bg-surface p-1">
+      <div role="tablist" aria-label="Registerblätter" className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-surface p-1">
         {VIEWS.map((item) => <button key={item.id} role="tab" aria-selected={view === item.id} type="button" onClick={() => chooseView(item.id)} className={`min-h-11 rounded-md px-2 text-sm font-medium ${view === item.id ? 'bg-ink text-bg' : 'text-muted'}`}>{item.label}</button>)}
       </div>
 
-      {!ready ? <div className="h-40 animate-pulse rounded-xl bg-surface" aria-label="Register wird geladen" /> : view === 'rundgaenge' ? <RoundsRegister rows={rows} /> : view === 'maengel' ? <DefectsRegister walks={walks} defects={defects} /> : <InspectionsRegister inspections={inspections} />}
+      {!ready ? <div className="h-40 animate-pulse rounded-xl bg-surface" aria-label="Register wird geladen" /> : view === 'rundgaenge' ? <RoundsRegister rows={rows} /> : <DefectsRegister walks={walks} defects={defects} />}
     </div>
   );
 }
@@ -99,26 +97,3 @@ function DefectRegisterRow({ defect, walk }: { defect: Defect; walk?: Walk }) {
   </tr>;
 }
 
-function InspectionsRegister({ inspections }: { inspections: Inspection[] }) {
-  const settings = useRegisterSettings();
-  const rows = inspections.map((inspection) => deriveInspection(inspection));
-  const add = async () => {
-    const stamp = new Date().toISOString();
-    await saveInspection({ id: crypto.randomUUID(), description: '', area: settings.areas[0] ?? '', intervalMonths: null, lastInspection: '', responsible: '', evidence: '', note: '', createdAt: stamp, updatedAt: stamp });
-  };
-  const save = (row: Inspection, patch: Partial<Inspection>) => void saveInspection({ ...row, ...patch });
-  return <div className="space-y-3">
-    <p className="text-sm text-muted">Geräte, Quartals- und Jahresprüfungen gemäss Excel-Blatt „Prüftermine“. Die Vorschlagszeilen werden bei der ersten Nutzung angelegt.</p>
-    <button type="button" className="btn-secondary" onClick={() => void add()}><Plus size={17} aria-hidden /> Prüfung ergänzen</button>
-    <div className="overflow-x-auto rounded-xl border border-line bg-surface"><table className="min-w-[1300px] border-collapse text-left text-xs"><thead className="bg-surface-2"><tr>{['Nr.', 'Prüfung', 'Bereich', 'Intervall (Monate)', 'Letzte Prüfung', 'Nächste Fälligkeit', 'Status', 'Verantwortlich', 'Nachweis / Ablage', 'Bemerkung'].map((title) => <th key={title} className="border-b border-line px-3 py-3 font-semibold">{title}</th>)}</tr></thead><tbody className="divide-y divide-line">
-    {rows.map((row, index) => <tr key={row.id} className={row.status === 'überfällig' ? 'bg-danger-soft/45' : row.status === 'bald fällig' ? 'bg-warn-soft/50' : ''}>
-      <td className="px-3 py-2">{index + 1}</td><td className="min-w-80 px-3 py-2"><input data-testid={`inspection-description-${row.id}`} className="field min-w-72 py-1.5 text-xs" value={row.description} onChange={(event) => save(row, { description: event.target.value })} /></td>
-      <td className="px-3 py-2"><select className="field min-w-40 py-1.5 text-xs" value={row.area} onChange={(event) => save(row, { area: event.target.value })}>{settings.areas.map((area) => <option key={area} value={area}>{area}</option>)}</select></td>
-      <td className="px-3 py-2"><input className="field w-28 py-1.5 text-xs" type="number" min={1} max={120} value={row.intervalMonths ?? ''} onChange={(event) => save(row, { intervalMonths: event.target.value ? Number(event.target.value) : null })} /></td>
-      <td className="px-3 py-2"><input className="field min-w-36 py-1.5 text-xs" type="date" value={row.lastInspection} onChange={(event) => save(row, { lastInspection: event.target.value })} /></td>
-      <td className="px-3 py-2 whitespace-nowrap">{formatDate(row.nextDue)}</td><td className={`px-3 py-2 font-medium ${row.status === 'überfällig' ? 'text-danger' : row.status === 'bald fällig' ? 'text-warn' : 'text-muted'}`}>{row.status}</td>
-      <td className="px-3 py-2"><input className="field min-w-36 py-1.5 text-xs" value={row.responsible} onChange={(event) => save(row, { responsible: event.target.value })} /></td><td className="px-3 py-2"><input className="field min-w-48 py-1.5 text-xs" value={row.evidence} onChange={(event) => save(row, { evidence: event.target.value })} /></td><td className="px-3 py-2"><input className="field min-w-48 py-1.5 text-xs" value={row.note} onChange={(event) => save(row, { note: event.target.value })} /></td>
-    </tr>)}
-  </tbody></table></div>
-  </div>;
-}

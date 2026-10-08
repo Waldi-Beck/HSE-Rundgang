@@ -122,9 +122,6 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await page.getByRole('tab', { name: 'Mängel' }).click();
   await expect(page.getByText('2026-').first()).toBeVisible();
   await expect(page.getByText('Feuerlöscher hinter Material abgestellt')).toBeVisible();
-  await page.getByRole('tab', { name: 'Prüftermine' }).click();
-  await expect(page.getByTestId('inspection-description-inspection-01')).toHaveValue('Sicherheitsdatenblätter auf Aktualität prüfen');
-
   const [xlsx] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Excel exportieren' }).click()]);
   expect(xlsx.suggestedFilename()).toMatch(/^HSE-Rundgang_Register_\d{4}-\d{2}-\d{2}\.xlsx$/);
   const xlsxPath = test.info().outputPath(xlsx.suggestedFilename());

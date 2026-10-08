@@ -1,6 +1,6 @@
 import type { PriorityKey, ResultKey } from './checklist';
 
-/** Editable area values from the workbook sheet Listen, cells A2:A12. */
+/** Editable area values available to the register and defect editor. */
 export const REGISTER_AREA_DEFAULTS = [
   'Engineering',
   'QLabs',
@@ -28,7 +28,7 @@ export const PRIORITIES: Record<PriorityKey, { label: string; name: string; defa
 export const PRIORITY_TEXT_TO_KEY: Record<string, PriorityKey> = { Kritisch: 'K', Hoch: 'H', Mittel: 'M', Niedrig: 'N' };
 export const PRIORITY_KEY_TO_TEXT: Record<PriorityKey, string> = { K: 'Kritisch', H: 'Hoch', M: 'Mittel', N: 'Niedrig' };
 
-/** Excel worksheet Listen dropdown options in their original order. */
+/** Result options used by the walk form and register. */
 export const RESULT_LABELS: Record<ResultKey, string> = {
   none: 'ohne Beanstandung',
   minor: 'mit geringfügigen Mängeln',
@@ -43,7 +43,7 @@ export const DEFAULT_REGISTER_SETTINGS = {
   maxIntervalDays: 14,
 };
 
-/** Excel Prüftermine proposal rows 7-21, wording and starting intervals retained. */
+/** Retained for backwards-compatible storage and existing local backups. */
 export const INITIAL_INSPECTIONS = [
   { description: 'Sicherheitsdatenblätter auf Aktualität prüfen', area: 'alle / QLabs', intervalMonths: 12, note: '' },
   { description: 'Gefahrstoffverzeichnis aktualisieren', area: 'alle', intervalMonths: 12, note: '' },

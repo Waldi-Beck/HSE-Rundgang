@@ -28,12 +28,12 @@ export async function exportWalkPdf(walkId: string): Promise<string> {
 }
 
 export async function exportRegisterXlsx(): Promise<string> {
-  const [walks, defects, inspections, savedSettings] = await Promise.all([
-    db.walks.toArray(), db.defects.toArray(), db.inspections.toArray(), db.settings.get('app'),
+  const [walks, defects, savedSettings] = await Promise.all([
+    db.walks.toArray(), db.defects.toArray(), db.settings.get('app'),
   ]);
   const settings = savedSettings ?? DEFAULT_REGISTER_SETTINGS;
   const { buildRegisterWorkbook } = await import('./lib/excel');
-  const buffer = await buildRegisterWorkbook({ walks, defects, inspections, settings });
+  const buffer = await buildRegisterWorkbook({ walks, defects, settings });
   const filename = `HSE-Rundgang_Register_${toISODate(new Date())}.xlsx`;
   const blobPart = new Uint8Array(buffer).buffer;
   downloadBlob(new Blob([blobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);

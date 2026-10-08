@@ -10,8 +10,9 @@ Der Rundgang wird direkt am Smartphone oder Tablet erfasst:
 - **Kapitel 2 Checkliste**: R1-R15 in fünf Räumen (75 Felder); optional M1-M9, wenn 2.2 geprüft wird. Grundlagen stehen unter jedem Punkt; „Rest OK“ beschleunigt die Prüfung.
 - **Kapitel 3 Mängel und Massnahmen**: Mangel-ID JJJJ-MM-TT-Mnn, Punkt/Bereich, Beschreibung, Gefahr, Sofortmassnahme, Massnahme, Priorität, Frist und Kamerafotos.
 - **Kapitel 4 Abschluss**: vier Gesamtbewertungen sowie Unterschrift der durchführenden Person und optionale Kenntnisnahme. Formulardaten sind nach Abschluss schreibgeschützt.
-- **Register als Excel-Ersatz**: Übersicht, Rundgänge, Mängel mit vier Statuswerten und Prüftermine mit 15 Startvorschlägen. Einstellungen übernehmen Richtfristen 0/2/7/30 Tage und Höchstintervall 14 Tage aus dem Excel-Blatt „Listen“.
-- **Exporte**: PDF nach aktueller DOTX-Vorlage, XLSX mit Rundgänge/Mängel/Prüftermine und JSON-Backup Formatversion 4.
+- **Register als Excel-Ersatz**: Übersicht, Rundgänge und Mängel mit vier Statuswerten. Einstellungen übernehmen Richtfristen 0/2/7/30 Tage und Höchstintervall 14 Tage aus dem Excel-Blatt „Listen“.
+- **Exporte**: PDF nach aktueller DOTX-Vorlage, XLSX mit Rundgänge und Mängel sowie JSON-Backup Formatversion 4.
+- Periodische Geräte- und Wartungsprüfungen („Prüftermine“) werden bewusst nicht in der App geführt; dafür bleibt das separate Excel-Blatt zuständig.
 - **Offline-fähig** (PWA, auf dem Startbildschirm installierbar). Daten liegen lokal im Browser (IndexedDB);
   Sicherung und Übertragung auf ein anderes Gerät per JSON-Datei unter "Sicherung".
 
