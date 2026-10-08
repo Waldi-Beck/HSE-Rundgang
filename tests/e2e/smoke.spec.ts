@@ -45,7 +45,7 @@ test('Wochenrundgang Raum für Raum, Mangel mit Foto und Bereich, abschliessen u
   await expect(page.getByRole('radio', { name: /Monatsrundgang \(2\.1 \+ 2\.2\)/ })).toHaveAttribute('aria-checked', 'true');
   await page.getByRole('radio', { name: /Wochenrundgang \(2\.1\)/ }).click();
   await page.getByLabel('Durchgeführt von').fill('Waldemar Becker');
-  await page.getByLabel('Begleitperson').fill('Roman Paharukov');
+  await page.getByLabel('Begleitperson').fill('Max Muster');
   await expect(page.getByLabel('Bereich', { exact: true })).toHaveCount(0); // Feld "Bereich" entfällt in Kapitel 1
   await page.getByTestId('to-checklist').click();
 
