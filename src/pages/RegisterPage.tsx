@@ -72,7 +72,7 @@ export function RegisterPage() {
         <div className="h-32 animate-pulse rounded-xl bg-surface" aria-label="Lädt" />
       ) : list.length === 0 ? (
         <EmptyState title={filter === 'open' ? 'Keine offenen Mängel' : 'Keine Einträge'}>
-          Mängel entstehen im Rundgang, wenn ein Punkt auf "Nicht OK" gesetzt wird.
+          Mängel entstehen im Rundgang, wenn ein Punkt auf "Mangel" gesetzt wird.
         </EmptyState>
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">

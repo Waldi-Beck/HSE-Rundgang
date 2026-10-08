@@ -1,6 +1,6 @@
 import { DownloadSimple, UploadSimple } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
-import { SOP_META } from '../data/checklist';
+import { LEGAL_FOOTNOTE, SOP_META } from '../data/checklist';
 import { db } from '../db';
 import { exportBackupJson } from '../export';
 import { backupPhotosToBlobs, parseBackup } from '../lib/backup';
@@ -113,7 +113,7 @@ export function BackupPage() {
           <dt className="text-muted">Ersteller</dt>
           <dd>{SOP_META.author}</dd>
         </dl>
-        <p className="mt-3 text-muted">Referenzen: {SOP_META.references}</p>
+        <p className="mt-3 text-muted">{LEGAL_FOOTNOTE}</p>
       </section>
     </div>
   );

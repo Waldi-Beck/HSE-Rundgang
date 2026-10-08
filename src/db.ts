@@ -16,6 +16,21 @@ db.version(1).stores({
   photos: 'id, defectId',
 });
 
+/**
+ * Version 2: neues Formular (Matrix 2.1 je Bereich, 2.2 Monatlich, Bewertung OK / Mangel / n.a., Mangel mit Bereich).
+ * Die App war vorher nicht produktiv im Einsatz: Testdaten im alten Aufbau werden verworfen,
+ * weil sie sich nicht sinnvoll auf die neue Checkliste abbilden lassen.
+ */
+db.version(2)
+  .stores({
+    walks: 'id, date, status',
+    defects: 'id, walkId, status, itemId, area',
+    photos: 'id, defectId',
+  })
+  .upgrade(async (tx) => {
+    await Promise.all([tx.table('walks').clear(), tx.table('defects').clear(), tx.table('photos').clear()]);
+  });
+
 export const uid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
 const emptySig = () => ({ name: '', date: '', image: '' });
@@ -33,12 +48,10 @@ export async function createWalk(at = new Date()): Promise<Walk> {
     time: toTime(at),
     inspector: last?.inspector ?? '',
     companion: '',
-    area: '',
     type: suggestType(date, others.map((w) => w.date)),
     openPointsNote: '',
     openPointsSnapshot: null,
     ratings: {},
-    observations: '',
     result: null,
     signature: emptySig(),
     acknowledgement: emptySig(),
@@ -100,12 +113,13 @@ export async function deleteWalk(id: string): Promise<void> {
   });
 }
 
-export function newDefectDraft(walk: Walk, existing: Defect[], itemId = ''): Defect {
+export function newDefectDraft(walk: Walk, existing: Defect[], itemId = '', area = ''): Defect {
   return {
     id: uid(),
     walkId: walk.id,
     nr: nextDefectNr(existing),
     itemId,
+    area,
     hazard: '',
     action: '',
     responsible: '',

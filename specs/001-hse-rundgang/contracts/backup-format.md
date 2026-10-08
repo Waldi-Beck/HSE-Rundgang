@@ -5,7 +5,7 @@
 ```json
 {
   "format": "qps-hse-rundgang-backup",
-  "formatVersion": 1,
+  "formatVersion": 2,
   "exportedAt": "2026-10-06T14:03:00.000Z",
   "sop": { "docId": "QPS_HSE_00064", "version": "1.0" },
   "walks":   [ /* Walk, siehe data-model.md */ ],
@@ -15,7 +15,8 @@
 ```
 
 Import-Regeln:
-- `format` muss `qps-hse-rundgang-backup` sein, `formatVersion` <= 1, sonst Abbruch mit Meldung.
+- `format` muss `qps-hse-rundgang-backup` sein, sonst Abbruch mit Meldung.
+- `formatVersion` muss 2 sein. Version 1 (alte Checkliste A bis G) wird mit der Meldung "Diese Sicherung stammt aus der alten Checkliste (Rubriken A bis G) und kann nicht eingelesen werden. …" abgewiesen; neuere Versionen mit Hinweis auf ein App-Update.
 - Einträge werden per `id` eingefügt oder ersetzt (upsert); nichts wird gelöscht.
 - Ergebnis: Anzahl importierter Rundgänge, Mängel, Fotos.
 
@@ -23,6 +24,6 @@ Import-Regeln:
 
 UTF-8 mit BOM, Trennzeichen `;`, Zeilenende CRLF. Spalten:
 
-`Rundgang;Datum;Nr;Pkt;Mangel/Gefahr;Massnahme;Verantwortlich;Prio;Frist;Status;Erledigt am;Vermerk`
+`Rundgang;Datum;Nr;Pkt;Bereich;Mangel/Gefahr;Massnahme;Verantwortlich;Prio;Frist;Status;Erledigt am;Vermerk`
 
-`Rundgang` = `2026-KW41`, `Status` = `offen` | `erledigt`.
+`Rundgang` = `2026-KW41`, `Bereich` = Klartext (z. B. `QLabs`, `Alle Bereiche / allgemein`), `Status` = `offen` | `erledigt`.

@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router';
-import { TYPE_HINT, TYPE_LABELS } from '../../data/checklist';
+import { TYPE_FORM_LABELS, TYPE_HINT } from '../../data/checklist';
 import { db, openDefectsBefore, updateWalk } from '../../db';
 import type { Walk, WalkType } from '../../lib/types';
 import { hiddenRatingsOnWeekly } from '../../lib/walk';
@@ -21,7 +21,7 @@ export function DataTab({ walk }: { walk: Walk }) {
   const setType = (type: WalkType) => {
     if (type === walk.type) return;
     const hidden = type === 'weekly' ? hiddenRatingsOnWeekly(walk) : [];
-    if (hidden.length && !confirm(`${hidden.length} Bewertungen aus B, D, E, M werden ausgeblendet und nicht gezählt. Fortfahren?`)) return;
+    if (hidden.length && !confirm(`${hidden.length} Bewertungen aus 2.2 Monatlich werden ausgeblendet und nicht gezählt. Fortfahren?`)) return;
     void save({ type });
   };
 
@@ -36,16 +36,13 @@ export function DataTab({ walk }: { walk: Walk }) {
           <Field label="Kalenderwoche" htmlFor="w-kw" hint="aus Datum berechnet">
             <input id="w-kw" className="field tabular-nums" value={`KW ${walk.week} / ${walk.isoYear}`} disabled readOnly />
           </Field>
+          <Field label="Durchgeführt von" htmlFor="w-inspector">
+            <AutoField id="w-inspector" value={walk.inspector} disabled={ro} autoComplete="name" onSave={(v) => save({ inspector: v })} />
+          </Field>
           <Field label="Uhrzeit" htmlFor="w-time">
             <input id="w-time" type="time" className="field" value={walk.time} disabled={ro} onChange={(e) => save({ time: e.target.value })} />
           </Field>
-          <Field label="Bereich" htmlFor="w-area">
-            <AutoField id="w-area" value={walk.area} disabled={ro} onSave={(v) => save({ area: v })} />
-          </Field>
         </div>
-        <Field label="Durchgeführt von" htmlFor="w-inspector">
-          <AutoField id="w-inspector" value={walk.inspector} disabled={ro} autoComplete="name" onSave={(v) => save({ inspector: v })} />
-        </Field>
         <Field label="Begleitperson" htmlFor="w-companion">
           <AutoField id="w-companion" value={walk.companion} disabled={ro} onSave={(v) => save({ companion: v })} />
         </Field>
@@ -65,7 +62,7 @@ export function DataTab({ walk }: { walk: Walk }) {
                   onClick={() => setType(t)}
                   className={`min-h-14 rounded-lg border px-3 py-2 text-left ${active ? 'border-accent bg-accent-soft' : 'border-line-strong bg-surface'}`}
                 >
-                  <div className="font-medium">{TYPE_LABELS[t]}</div>
+                  <div className="font-medium">{TYPE_FORM_LABELS[t]}</div>
                   <div className="text-sm text-muted">{TYPE_HINT[t]}</div>
                 </button>
               );

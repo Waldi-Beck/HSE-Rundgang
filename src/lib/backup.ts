@@ -1,11 +1,15 @@
 /** JSON-Sicherung und CSV-Mängelregister (contracts/backup-format.md). */
-import { SOP_META } from '../data/checklist';
+import { SOP_META, areaLabel } from '../data/checklist';
 import { formatDate, weekLabel } from './dates';
 import { blobToDataUrl, dataUrlToBlob } from './image';
 import type { Defect, Photo, Walk } from './types';
 
 export const BACKUP_FORMAT = 'qps-hse-rundgang-backup';
-export const BACKUP_VERSION = 1;
+/**
+ * 2 = Formular mit Matrix 2.1 je Bereich, 2.2 Monatlich, Bewertung OK / Mangel / n.a., Mangel mit Bereich.
+ * Version 1 (alte Checkliste A bis G, M1 bis M12) kann nicht eingelesen werden.
+ */
+export const BACKUP_VERSION = 2;
 
 export interface BackupPhoto extends Omit<Photo, 'blob'> {
   dataUrl: string;
@@ -43,8 +47,13 @@ export function parseBackup(text: string): BackupFile {
   }
   const b = data as Partial<BackupFile>;
   if (b?.format !== BACKUP_FORMAT) throw new Error('Keine Sicherungsdatei der HSE-Rundgang App.');
-  if (typeof b.formatVersion !== 'number' || b.formatVersion > BACKUP_VERSION)
-    throw new Error('Sicherungsformat wird von dieser App-Version nicht unterstützt.');
+  if (typeof b.formatVersion !== 'number') throw new Error('Sicherungsdatei ist unvollständig (Formatversion fehlt).');
+  if (b.formatVersion < BACKUP_VERSION)
+    throw new Error(
+      'Diese Sicherung stammt aus der alten Checkliste (Rubriken A bis G) und kann nicht eingelesen werden. Die App verwendet das neue Formular mit Bereichen (2.1 / 2.2).',
+    );
+  if (b.formatVersion > BACKUP_VERSION)
+    throw new Error('Sicherungsformat ist neuer als diese App-Version. Bitte die App aktualisieren.');
   if (!Array.isArray(b.walks) || !Array.isArray(b.defects) || !Array.isArray(b.photos))
     throw new Error('Sicherungsdatei ist unvollständig.');
   return b as BackupFile;
@@ -60,7 +69,7 @@ const csvCell = (v: string | number | null | undefined) => {
 };
 
 export const CSV_HEADER = [
-  'Rundgang', 'Datum', 'Nr', 'Pkt', 'Mangel/Gefahr', 'Massnahme', 'Verantwortlich', 'Prio', 'Frist', 'Status', 'Erledigt am', 'Vermerk',
+  'Rundgang', 'Datum', 'Nr', 'Pkt', 'Bereich', 'Mangel/Gefahr', 'Massnahme', 'Verantwortlich', 'Prio', 'Frist', 'Status', 'Erledigt am', 'Vermerk',
 ];
 
 /** Excel-kompatibel: UTF-8 mit BOM, Semikolon, CRLF. */
@@ -70,7 +79,7 @@ export function defectsToCsv(defects: Defect[], walksById: Map<string, Walk>): s
     return [
       w ? weekLabel(w.isoYear, w.week) : '',
       w ? formatDate(w.date) : '',
-      d.nr, d.itemId, d.hazard, d.action, d.responsible, d.prio, formatDate(d.due),
+      d.nr, d.itemId, areaLabel(d.area), d.hazard, d.action, d.responsible, d.prio, formatDate(d.due),
       d.status === 'done' ? 'erledigt' : 'offen', formatDate(d.doneAt), d.doneNote,
     ].map(csvCell).join(';');
   });

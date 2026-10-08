@@ -6,7 +6,7 @@ import { closeWalk, deleteWalk, openDefectsBefore, updateWalk } from '../../db';
 import { exportWalkPdf } from '../../export';
 import { formatDate } from '../../lib/dates';
 import type { Defect, ResultKey, Signature, Walk } from '../../lib/types';
-import { countRatings, openPointLabel, suggestResult, validateForClose } from '../../lib/walk';
+import { countRatings, defectCounts, openPointLabel, suggestResult, validateForClose } from '../../lib/walk';
 import { AutoField } from '../../components/AutoField';
 import { SignaturePad } from '../../components/SignaturePad';
 import { Badge, Field, useToast } from '../../components/ui';
@@ -85,29 +85,28 @@ export function CloseTab({ walk, defects }: { walk: Walk; defects: Defect[] }) {
     navigate('/');
   };
 
+  const dc = defectCounts(defects);
   const stats = [
-    { label: 'Kontrolliert', value: c.checked, testid: 'count-checked' },
-    { label: 'OK', value: c.ok, testid: 'count-ok' },
-    { label: 'Nicht OK', value: c.nok, testid: 'count-nok' },
-    { label: 'N/A', value: c.na, testid: 'count-na' },
+    { label: 'Anzahl Mängel', value: dc.total, testid: 'count-defects', danger: false },
+    { label: 'davon kritisch (K)', value: dc.critical, testid: 'count-critical', danger: true },
   ];
 
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-line bg-surface p-4">
         <h2 className="text-lg font-semibold">3. Ergebnis und Abschluss</h2>
-        <dl className="mt-3 grid grid-cols-4 divide-x divide-line rounded-lg border border-line">
+        <dl className="mt-3 grid grid-cols-2 divide-x divide-line rounded-lg border border-line">
           {stats.map((s) => (
             <div key={s.label} className="px-2 py-2.5 text-center">
               <dt className="text-xs text-muted">{s.label}</dt>
-              <dd className={`text-xl font-semibold tabular-nums ${s.label === 'Nicht OK' && s.value ? 'text-danger' : ''}`} data-testid={s.testid}>
+              <dd className={`text-xl font-semibold tabular-nums ${s.danger && s.value ? 'text-danger' : ''}`} data-testid={s.testid}>
                 {s.value}
               </dd>
             </div>
           ))}
         </dl>
         <p className="mt-2 text-sm text-muted tabular-nums">
-          {c.checked} von {c.total} Punkten bewertet.
+          {c.checked} von {c.total} Feldern bewertet (OK {c.ok}, Mangel {c.mangel}, n.a. {c.na}).
         </p>
 
         <fieldset className="mt-5">

@@ -29,7 +29,7 @@
 
 ## R7 Gestaltung (Taste-Skill)
 - **Decision**: Design read "regulierte, vertrauensorientierte Arbeits-App für Mobilgeräte, ruhig, gut lesbar im Werkstattlicht". Dials VARIANCE 3, MOTION 2, DENSITY 5.
-  Schrift Geist (lokal gebündelt, nicht Inter), Icons Phosphor, neutrale Zinc-Basis mit einem Akzent (Smaragd/Grün für Sicherheit; Rot/Bernstein nur semantisch für Nicht OK / überfällig), ein Radius-System (Karten 12 px, Steuerelemente 10 px), Labels über Feldern, keine Gedankenstriche in UI-Texten, Leer-/Fehlerzustände, Dark Mode über Tokens, `min-h-[100dvh]`.
+  Schrift Geist (lokal gebündelt, nicht Inter), Icons Phosphor, neutrale Zinc-Basis mit einem Akzent (Smaragd/Grün für Sicherheit; Rot/Bernstein nur semantisch für Mangel / überfällig), ein Radius-System (Karten 12 px, Steuerelemente 10 px), Labels über Feldern, keine Gedankenstriche in UI-Texten, Leer-/Fehlerzustände, Dark Mode über Tokens, `min-h-[100dvh]`.
 - **Note**: Taste-Skill nennt Dashboards/Formular-Apps als "out of scope"; angewendet werden daher nur die allgemeinen Regeln (Typografie, Farbe, Zustände, Formular-Kontrast, AI-Tells).
 
 ## R8 PWA

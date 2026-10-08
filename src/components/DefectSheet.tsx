@@ -1,14 +1,14 @@
 import { X } from '@phosphor-icons/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
-import { PRIO } from '../data/checklist';
+import { MONTHLY_ITEMS, PRIO, WEEKLY_ITEMS } from '../data/checklist';
 import { db, deleteDefect, saveDefect } from '../db';
 import type { Defect, Prio, Walk } from '../lib/types';
-import { defectMissingFields, dueFromPrio, visibleSections } from '../lib/walk';
+import { areasForItem, defectMissingFields, defectPointLabel, dueFromPrio } from '../lib/walk';
 import { PhotoInput, type PhotoDraft } from './PhotoInput';
 import { Field } from './ui';
 
-/** Formular Kapitel 4: Mangel / Gefahr, Massnahme, Verantwortlich, Frist, Prio, Fotos (FR-030 bis FR-034). */
+/** Formular Kapitel 4: Pkt. und Bereich, Mangel / Gefahr, Massnahme, Verantwortlich, Frist, Prio, Fotos (FR-030 bis FR-034). */
 export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Defect; onClose: (saved: boolean) => void }) {
   const readOnly = walk.status === 'closed';
   const [d, setD] = useState<Defect>(defect);
@@ -57,7 +57,10 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
     onClose(true);
   };
 
-  const items = visibleSections(walk.type).flatMap((s) => s.items);
+  const items = walk.type === 'monthly' ? [...WEEKLY_ITEMS, ...MONTHLY_ITEMS] : WEEKLY_ITEMS;
+  const areaOptions = d.itemId ? areasForItem(d.itemId) : [];
+  const setItem = (itemId: string) =>
+    set({ itemId, area: itemId && areasForItem(itemId).some((a) => a.id === d.area) ? d.area : '' });
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="defect-title" className="fixed inset-0 z-40 flex flex-col bg-bg">
@@ -65,7 +68,7 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <h2 id="defect-title" className="text-lg font-semibold">
             Mangel Nr. {d.nr}
-            {d.itemId && <span className="font-normal text-muted"> zu {d.itemId}</span>}
+            {d.itemId && <span className="font-normal text-muted"> zu {d.area ? defectPointLabel(d) : d.itemId}</span>}
           </h2>
           <button type="button" onClick={() => onClose(false)} aria-label="Schliessen" className="grid h-11 w-11 place-items-center rounded-lg">
             <X size={22} aria-hidden />
@@ -76,11 +79,27 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl space-y-5 px-4 py-5">
           <Field label="Pkt. (Checklistenpunkt)" htmlFor="d-item" error={showErrors && !d.itemId ? 'Bitte Punkt wählen.' : undefined}>
-            <select id="d-item" className="field" value={d.itemId} disabled={readOnly} onChange={(e) => set({ itemId: e.target.value })}>
+            <select id="d-item" className="field" value={d.itemId} disabled={readOnly} onChange={(e) => setItem(e.target.value)}>
               <option value="">Bitte wählen</option>
               {items.map((i) => (
                 <option key={i.id} value={i.id}>
                   {i.id}: {i.text}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field
+            label="Bereich"
+            htmlFor="d-area"
+            hint={d.itemId && !d.itemId.startsWith('W') ? 'Monatspunkt: Bereich oder "Alle Bereiche / allgemein" wählen.' : undefined}
+            error={showErrors && !d.area ? 'Bitte Bereich wählen.' : undefined}
+          >
+            <select id="d-area" className="field" value={d.area} disabled={readOnly || !d.itemId} onChange={(e) => set({ area: e.target.value })}>
+              <option value="">{d.itemId ? 'Bitte wählen' : 'Zuerst Pkt. wählen'}</option>
+              {areaOptions.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
                 </option>
               ))}
             </select>

@@ -1,6 +1,7 @@
 import type { PRIO, RESULT_LABELS } from '../data/checklist';
 
-export type Rating = 'ok' | 'nok' | 'na';
+/** SOP 2 "Bewertung": OK / Mangel / n.a. */
+export type Rating = 'ok' | 'mangel' | 'na';
 export type WalkType = 'weekly' | 'monthly';
 export type WalkStatus = 'draft' | 'closed';
 export type Prio = keyof typeof PRIO;
@@ -20,13 +21,12 @@ export interface Walk {
   time: string; // HH:MM
   inspector: string;
   companion: string;
-  area: string;
   type: WalkType;
   openPointsNote: string;
   /** Beim Abschluss eingefrorene Liste offener Punkte aus früheren Rundgängen */
   openPointsSnapshot: string[] | null;
+  /** Schlüssel: Wochenpunkt je Bereich `W4@qlabs`, Monatspunkt `M1` */
   ratings: Record<string, Rating>;
-  observations: string;
   result: ResultKey | null;
   signature: Signature;
   acknowledgement: Signature;
@@ -42,6 +42,8 @@ export interface Defect {
   walkId: string;
   nr: number;
   itemId: string;
+  /** Bereich (SOP 4 "Nr. / Pkt. / Bereich"): AreaId, bei Monatspunkten auch 'alle' */
+  area: string;
   hazard: string;
   action: string;
   responsible: string;

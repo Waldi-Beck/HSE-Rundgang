@@ -6,16 +6,18 @@ Sie bildet die SOP **QPS_HSE_00064 "HSE Wöchentlicher Rundgang"**, Version 1.0,
 
 Der Rundgang wird direkt am Smartphone oder Tablet erfasst:
 
-- **Kapitel 1 Rundgangdaten**: Datum, Kalenderwoche (automatisch nach ISO 8601), Uhrzeit, Durchgeführt von, Begleitperson, Bereich.
-  Die App schlägt beim ersten Rundgang im Monat den **Monatsrundgang** (A bis G + M) vor, sonst den **Wochenrundgang** (A, C, F, G).
+- **Kapitel 1 Rundgangdaten**: Datum, Kalenderwoche (automatisch nach ISO 8601), Durchgeführt von, Uhrzeit, Begleitperson.
+  Die App schlägt beim ersten Rundgang im Monat den **Monatsrundgang (2.1 + 2.2)** vor, sonst den **Wochenrundgang (2.1)**.
   Offene Mängel früherer Rundgänge erscheinen unter "Offene Punkte Vorwoche" und können dort nachkontrolliert werden.
-- **Kapitel 2 Checkliste**: alle Punkte A1 bis M12 mit Rhythmus und Rechtsgrundlagen, Bewertung OK / Nicht OK / N/A mit grossen Tasten.
-  "Nicht OK" öffnet direkt das Mängel-Formular.
-- **Kapitel 3 Ergebnis**: Zähler, Vorschlag für das Gesamtergebnis, Unterschrift am Bildschirm (Durchführende/r, optional Kenntnisnahme).
+- **Kapitel 2 Checkliste, Raum für Raum**: 2.1 Wöchentlich, W1 bis W16 je Bereich (Gänge / Treppen, Engineering, QLabs, QMeasure,
+  xTec Lager, xTec Werkstatt, also 96 Felder); beim Monatsrundgang zusätzlich 2.2 Monatlich (M1 bis M9).
+  Bewertung OK / Mangel / n.a. mit grossen Tasten, Rechtsgrundlage je Punkt, "Rest OK" je Bereich.
+  "Mangel" öffnet direkt das Mängel-Formular mit Punkt und Bereich.
+- **Kapitel 3 Ergebnis**: Anzahl Mängel, davon kritisch (K), Vorschlag für das Gesamtergebnis, Unterschrift am Bildschirm (Durchführende/r, optional Kenntnisnahme).
   Abschluss nur, wenn alles vollständig ist; danach schreibgeschützt.
-- **Kapitel 4 Mängel und Massnahmen**: Mangel/Gefahr, Massnahme, Verantwortlich, Prio K/H/M/N mit automatischem Fristvorschlag
+- **Kapitel 4 Mängel und Massnahmen**: Nr. / Pkt. / Bereich, Mangel/Gefahr, Massnahme, Verantwortlich, Prio K/H/M/N mit automatischem Fristvorschlag
   (sofort / 48 Std. / 1 Woche / 1 Monat) und **Fotos direkt aus der Kamera** (werden auf 1600 px verkleinert).
-- **Mängelregister**: alle Mängel über alle Rundgänge, offen/erledigt, überfällige Fristen, CSV-Export für Excel.
+- **Mängelregister**: alle Mängel über alle Rundgänge mit Punkt und Bereich, offen/erledigt, überfällige Fristen, CSV-Export für Excel.
 - **PDF-Bericht** im Aufbau der Vorlage, inklusive Fotos und Unterschrift, Dateiname `HSE-Rundgang_JJJJ-KWxx.pdf` (SOP Kapitel 5).
 - **Offline-fähig** (PWA, auf dem Startbildschirm installierbar). Daten liegen lokal im Browser (IndexedDB);
   Sicherung und Übertragung auf ein anderes Gerät per JSON-Datei unter "Sicherung".
@@ -40,7 +42,7 @@ Weitere Befehle:
 
 ```bash
 npm run typecheck    # TypeScript prüfen
-npm test             # Unit-Tests (Vitest): KW, Prio -> Frist, Zähler, Ergebnis, Validierung, Checkliste
+npm test             # Unit-Tests (Vitest): KW, Prio -> Frist, Zähler, Ergebnis, Validierung, Checkliste, Sicherung
 npm run build        # Produktions-Build nach dist/
 npm run preview      # Build lokal ansehen
 npm run test:e2e     # Playwright-Smoke-Test (mobiler Viewport), erzeugt docs/screenshots/
@@ -81,14 +83,14 @@ Ein `iframe` ist nicht empfohlen: Kamera-Zugriff und Downloads sind in eingebett
 
 ## SOP-Änderungen
 
-Die gesamte Checkliste steht in **`src/data/checklist.ts`** (Rubriken, Punkte, Rhythmus, Rechtsgrundlagen, Kopfdaten `SOP_META`).
+Die gesamte Checkliste steht in **`src/data/checklist.ts`** (Bereiche, Punkte W/M, Grundlagen je Kontrollpunkt, Formulartexte, Kopfdaten `SOP_META`).
 Bei einer neuen SOP-Version:
 
 1. `SOP_META.version` und `validFrom` anpassen, Punkte ändern (bestehende IDs nicht umnummerieren).
-2. `npm test` ausführen (der Test prüft u. a. die Anzahl Punkte je Rubrik; bei Änderungen dort anpassen).
+2. `npm test` ausführen (der Test prüft u. a. 16 × 6 + 9 Punkte und dass jeder Punkt genau einer Grundlage zugeordnet ist).
 3. Spezifikation unter `specs/001-hse-rundgang/` nachführen.
 
-Jeder Rundgang speichert die SOP-Version, mit der er erstellt wurde.
+Jeder Rundgang speichert die SOP-Version, mit der er erstellt wurde. Änderungen der App: siehe `CHANGELOG.md`.
 
 ## Projektaufbau
 

@@ -28,7 +28,7 @@ export function DefectsTab({
       <div className="flex items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">4. Mängel und Massnahmen</h2>
-          <p className="text-sm text-muted">Prio: K sofort, H 48 Std., M 1 Woche, N 1 Monat (Richtwerte)</p>
+          <p className="text-sm text-muted">Je Mangel Punkt und Bereich. Prio: K sofort, H 48 Std., M 1 Woche, N 1 Monat (Richtwerte)</p>
         </div>
         {!ro && (
           <button type="button" className="btn-secondary shrink-0" onClick={() => onNewDefect()}>
@@ -38,7 +38,7 @@ export function DefectsTab({
       </div>
       {defects.length === 0 ? (
         <EmptyState title="Keine Mängel erfasst">
-          Einen Punkt in der Checkliste auf "Nicht OK" setzen, dann öffnet sich das Mängel-Formular mit Foto.
+          Einen Punkt in der Checkliste auf "Mangel" setzen, dann öffnet sich das Mängel-Formular mit Punkt, Bereich und Foto.
         </EmptyState>
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">

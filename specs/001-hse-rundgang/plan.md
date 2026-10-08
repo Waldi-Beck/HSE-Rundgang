@@ -7,7 +7,7 @@
 ## Summary
 
 Mobile-first, offline-fähige Single-Page-App, die die SOP QPS_HSE_00064 abbildet: Rundgang anlegen
-(KW, Wochen/Monats-Vorschlag), Checkliste je Rubrik bewerten, Mängel mit Kamera-Fotos erfassen,
+(KW, Wochen/Monats-Vorschlag), Checkliste Raum für Raum (Punkt × Bereich) bewerten, Mängel mit Kamera-Fotos erfassen,
 mit Bildschirm-Unterschrift abschliessen, PDF-Bericht `HSE-Rundgang_JJJJ-KWxx.pdf` erzeugen,
 offene Mängel über Rundgänge verfolgen. Rein statisches Frontend mit Datenhaltung in IndexedDB;
 Auslieferung über GitHub Pages oder einen beliebigen Webserver, verlinkt aus Odoo.
@@ -68,7 +68,7 @@ src/
 ├── data/checklist.ts        # SOP-Definition (einzige Quelle), SOP_META
 ├── lib/                     # reine Fachlogik (getestet)
 │   ├── dates.ts             # ISO-KW, Datumsformat, Dateiname
-│   ├── walk.ts              # Rubriken je Art, Zähler, Ergebnis, Validierung, Prio->Frist
+│   ├── walk.ts              # Felder je Art und Bereich, Zähler, Ergebnis, Validierung, Prio->Frist
 │   ├── image.ts             # Foto verkleinern (Canvas)
 │   ├── pdf.ts               # PDF-Bericht (jsPDF)
 │   ├── backup.ts            # JSON Export/Import, CSV-Register

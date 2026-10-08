@@ -66,6 +66,23 @@ description: "Task list for HSE-Rundgang App"
 - [x] T029 [P] README (DE), GitHub Pages workflow `.github/workflows/pages.yml`, `.vscode/`, `.gitignore`
 - [x] T030 Taste-skill pre-flight review (no em/en dashes in UI strings, contrast, radius lock, empty/error states)
 
+## Phase 9: Formular-Revision 2026-10-08 (Matrix je Bereich)
+
+- [x] T031 Checklisten-Definition neu: `AREAS`, `WEEKLY_ITEMS` W1 bis W16, `MONTHLY_ITEMS` M1 bis M9, `LEGAL_BASES`, Formulartexte wörtlich in `src/data/checklist.ts` (FR-010, FR-018)
+- [x] T032 Typen: `Rating` = ok / mangel / na, `Defect.area`, `Walk.area` und `observations` entfernt in `src/lib/types.ts`
+- [x] T033 Fachlogik: Keys `W4@qlabs` / `M1`, `ratableKeys`, Zählung je Bereich, `defectCounts`, Validierung Punkt + Bereich in `src/lib/walk.ts` (FR-011, FR-020, FR-024, FR-035)
+- [x] T034 Dexie Version 2 mit Upgrade (alte Testdaten verwerfen) in `src/db.ts` (FR-026)
+- [x] T035 [P] Sicherung Formatversion 2, Abweisung alter Dateien, CSV-Spalte Bereich in `src/lib/backup.ts` (FR-026, FR-042, FR-052)
+- [x] T036 [US1] Checkliste Raum für Raum: Bereichs-Kacheln mit Fortschritt, 16 Punkte, Grundlage je Punkt, "Rest OK", Schritt 2.2 in `src/pages/walk/ChecklistTab.tsx` (FR-014, FR-017)
+- [x] T037 [US2] Mängel-Formular mit Pflichtfeld Bereich (Wochenpunkt 6 Bereiche, Monatspunkt + allgemein) in `src/components/DefectSheet.tsx` (FR-013, FR-030, FR-035)
+- [x] T038 [US1] Kapitel 1 ohne Feld "Bereich", Rundgangsart-Texte aus dem Formular in `src/pages/walk/DataTab.tsx` (FR-001)
+- [x] T039 [US3] Abschluss: Anzahl Mängel / davon kritisch (K) in `src/pages/walk/CloseTab.tsx` (FR-020)
+- [x] T040 [US4] Punkt + Bereich in "Offene Punkte Vorwoche", Register und CSV (FR-005, FR-042)
+- [x] T041 [US3] PDF nach neuem Formular: Matrix 2.1 mit gezeichneten ✓ / ✗ / –, Tabelle 2.2, Kapitel 3 bis 5 neu, Kopf unverändert in `src/lib/pdf.ts` (FR-050, FR-055)
+- [x] T042 Unit-Tests: Vollständigkeit 16 × 6 + 9, Grundlagen-Zuordnung, Zähler, Validierung, Bereich, Sicherung in `tests/unit/*.test.ts`
+- [x] T043 Playwright: Wochenrundgang QLabs W4 Mangel mit Foto, "Rest OK" alle Bereiche, Abschluss, PDF, Folgerundgang; Monatsrundgang mit M2 "Alle Bereiche / allgemein" in `tests/e2e/smoke.spec.ts`
+- [x] T044 [P] Beispielbericht `docs/beispiel-bericht_HSE-Rundgang_2026-KW41.pdf`, Screenshots, README, Spec, Data Model, `CHANGELOG.md`
+
 ## Dependencies
 
 Setup -> Foundational -> US1 -> US2 -> US3 -> (US4, US5 parallel) -> Polish.

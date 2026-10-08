@@ -4,6 +4,7 @@ import { PRIO } from '../data/checklist';
 import { setDefectDone } from '../db';
 import { formatDate, isOverdue, toISODate, weekLabel } from '../lib/dates';
 import type { Defect, Walk } from '../lib/types';
+import { defectPointLabel } from '../lib/walk';
 import { Badge } from './ui';
 
 /** Ein Mangel mit Nachkontrolle (FR-040). Wird in "Offene Punkte Vorwoche" und im Register verwendet. */
@@ -29,7 +30,7 @@ export function DefectRow({
       <button type="button" onClick={onOpen} disabled={!onOpen} className="block w-full text-left">
         <div className="flex flex-wrap items-center gap-1.5 text-sm">
           <span className="font-semibold">Nr. {defect.nr}</span>
-          <span className="text-muted">{defect.itemId}</span>
+          <span className="text-muted">{defectPointLabel(defect)}</span>
           {showOrigin && walk && <span className="text-muted">{weekLabel(walk.isoYear, walk.week)}</span>}
           <span className="ml-auto flex items-center gap-1.5">
             <Badge tone={defect.prio === 'K' ? 'danger' : 'neutral'}>

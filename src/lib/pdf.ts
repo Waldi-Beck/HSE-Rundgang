@@ -1,17 +1,35 @@
 /**
  * PDF-Bericht gemäss SOP 5 (FR-050, FR-051, FR-053).
- * Layout nach der QPS-Vorlage QPS_HSE_00064 (Word): Kopfzeile mit Dokumenten-ID,
+ * Layout nach dem QPS-Formular QPS_HSE_00064 (Word, Stand 29.09.2026): Kopfzeile mit Dokumenten-ID,
  * Titel, Version, Gültig ab und QPS-Logo, Kapitel 1 bis 5, Fusszeile "Seite x von y".
  * Farben und Füllungen sind direkt aus der Vorlage übernommen.
+ * Zeichen ausserhalb WinAnsi (✓ ✗ ☐ →) werden als Vektorgrafik gezeichnet, weil Helvetica sie nicht enthält.
  */
 import { jsPDF } from 'jspdf';
 import { autoTable, type CellHookData, type RowInput } from 'jspdf-autotable';
 import { QPS_LOGO_PNG, QPS_LOGO_RATIO } from '../assets/qpsLogo';
-import { PRIO, RESULT_LABELS, SOP_META } from '../data/checklist';
-import { formatDate, weekLabel } from './dates';
+import {
+  APPROVAL,
+  AREAS,
+  CHANGE_LOG,
+  LEGAL_BASES,
+  LEGAL_FOOTNOTE,
+  MONTHLY_ITEMS,
+  MONTHLY_TITLE,
+  NOT_IN_WALK_TEXT,
+  PRIO,
+  PROCEDURE_TEXT,
+  RESULT_LABELS,
+  SOP_META,
+  TYPE_FORM_LABELS,
+  WEEKLY_ITEMS,
+  WEEKLY_TITLE,
+  areaLabel,
+} from '../data/checklist';
+import { formatDate } from './dates';
 import { blobToDataUrl } from './image';
-import type { Defect, Photo, Prio, ResultKey, Walk } from './types';
-import { countRatings, openPointLabel, visibleSections } from './walk';
+import type { Defect, Photo, Prio, Rating, ResultKey, Walk } from './types';
+import { cellKey, defectCounts, defectsForCell, openPointLabel } from './walk';
 
 type RGB = [number, number, number];
 const hex = (h: string): RGB => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
@@ -23,6 +41,7 @@ const C = {
   heading: hex('0F4761'),
   docId: hex('2503F3'),
   muted: hex('595959'),
+  grey: hex('8C8C8C'),
   green: hex('375623'),
   orange: hex('C55A11'),
   red: hex('C00000'),
@@ -30,12 +49,9 @@ const C = {
   line: hex('808080'),
   fillLabel: hex('F2F2F2'),
   fillHead: hex('D9D9D9'),
-  fillSection: hex('DEEAF6'),
   fillOkHead: hex('E2EFDA'),
   fillNokHead: hex('FBE3E3'),
-  fillOk: hex('F3F9F0'),
   fillNok: hex('FDF4F4'),
-  fillNa: hex('F8F8F8'),
   fillMinor: hex('FFF2CC'),
   fillOpen: hex('FCE4D6'),
 };
@@ -54,12 +70,8 @@ const RESULT_STYLE: Record<ResultKey, { fill: RGB; text: RGB }> = {
 };
 const PRIO_COLOR: Record<Prio, RGB> = { K: C.red, H: C.orange, M: C.amber, N: C.ink };
 
-/** Wortlaut der Referenzen aus Kapitel 5 der Vorlage */
-const SOP_REFERENCES_TEXT =
-  'VUV · ArGV 3 · ArGV 4 · MaschV · NIV · ChemV · VVEA/VVA · VKF-Brandschutzvorschriften · EKAS 6508 · intern: SOP_0016, HSE-Konzept xTec – massgebend sind die gültigen Fassungen (fedlex.admin.ch); ersetzt keine Rechtsberatung.';
-
-/** Rubrikentitel wie in der SOP (App nutzt Doppelpunkt, Vorlage Gedankenstrich). */
-const sopTitle = (t: string) => t.replace(': ', ' – ');
+/** Spaltenköpfe der Matrix 2.1 (Umbruch wie im Formular) */
+const AREA_HEADS: Record<string, string> = { gaenge: 'Gänge /\nTreppen', 'xtec-werkstatt': 'xTec\nWerkstatt' };
 
 export interface PdfInput {
   walk: Walk;
@@ -84,6 +96,79 @@ function checkbox(doc: jsPDF, x: number, y: number, checked: boolean, color: RGB
     doc.line(x + s - 0.55, y + 0.55, x + 0.55, y + s - 0.55);
     doc.setLineWidth(0.2);
   }
+}
+
+type Sym = 'check' | 'cross' | 'dash';
+const SYM_COLOR: Record<Sym, RGB> = { check: C.green, cross: C.red, dash: C.grey };
+const RATING_SYM: Record<Rating, Sym> = { ok: 'check', mangel: 'cross', na: 'dash' };
+
+/** ✓ / ✗ / – als Vektorgrafik, (cx, cy) = Mitte, s = Kantenlänge */
+function symbol(doc: jsPDF, kind: Sym, cx: number, cy: number, s = 2.6) {
+  const h = s / 2;
+  doc.setDrawColor(...SYM_COLOR[kind]);
+  doc.setLineCap('round');
+  doc.setLineJoin('round');
+  if (kind === 'check') {
+    doc.setLineWidth(0.5);
+    doc.lines(
+      [
+        [h * 0.75, h * 0.75],
+        [h * 1.15, -h * 1.6],
+      ],
+      cx - h * 0.95,
+      cy + h * 0.1,
+    );
+  } else if (kind === 'cross') {
+    doc.setLineWidth(0.5);
+    doc.line(cx - h * 0.8, cy - h * 0.8, cx + h * 0.8, cy + h * 0.8);
+    doc.line(cx + h * 0.8, cy - h * 0.8, cx - h * 0.8, cy + h * 0.8);
+  } else {
+    doc.setLineWidth(0.4);
+    doc.line(cx - h * 0.7, cy, cx + h * 0.7, cy);
+  }
+  doc.setLineCap('butt');
+  doc.setLineJoin('miter');
+  doc.setLineWidth(0.2);
+}
+
+/** Textstück für Fliesstext mit Farben, Schnitt und gezeichneten Symbolen */
+type Seg = { t: string; color?: RGB; style?: 'normal' | 'bold' | 'italic' } | { sym: Sym };
+
+/**
+ * Fliesstext mit Zeilenumbruch an Wortgrenzen. Gibt die Anzahl Zeilen zurück.
+ * Mit draw = false wird nur gemessen.
+ */
+function richText(doc: jsPDF, segs: Seg[], x0: number, y0: number, maxW: number, size: number, lineH: number, draw = true): number {
+  doc.setFontSize(size);
+  let x = x0;
+  let line = 0;
+  const symW = size * 0.3;
+  for (const sg of segs) {
+    if ('sym' in sg) {
+      if (x + symW > x0 + maxW && x > x0) {
+        line++;
+        x = x0;
+      }
+      if (draw) symbol(doc, sg.sym, x + symW / 2, y0 + line * lineH - size * 0.12, symW * 0.85);
+      x += symW;
+      continue;
+    }
+    doc.setFont('helvetica', sg.style ?? 'normal');
+    doc.setTextColor(...(sg.color ?? C.ink));
+    for (const tok of sg.t.split(/(\s+)/)) {
+      if (!tok) continue;
+      const w = doc.getTextWidth(tok);
+      const space = /^\s+$/.test(tok);
+      if (!space && x + w > x0 + maxW && x > x0) {
+        line++;
+        x = x0;
+      }
+      if (space && x === x0) continue;
+      if (draw) doc.text(tok, x, y0 + line * lineH);
+      x += w;
+    }
+  }
+  return line + 1;
 }
 
 function fitImage(w: number, h: number, maxW: number, maxH: number) {
@@ -127,36 +212,32 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
       y = TOP + 2;
     }
   };
-  const h1 = (text: string) => {
-    ensure(30);
+  const h1 = (text: string, need = 30) => {
+    ensure(need);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(17);
     doc.setTextColor(...C.heading);
     doc.text(text, ML, y + 6);
     y += 10;
   };
-  const h3 = (text: string) => {
-    ensure(18);
+  const h3 = (text: string, need = 18) => {
+    ensure(need);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.setTextColor(...C.heading);
     doc.text(text, ML, y + 4);
-    y += 6.5;
+    y += 6;
   };
 
-  // Titel
+  // Titel wie Formular: "HSE Wöchentlicher Rundgang" + klein "Formular"
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(25);
   doc.setTextColor(...C.title);
-  doc.text('HSE Rundgang', ML, y + 8);
+  doc.text(SOP_META.title, ML, y + 8);
+  const tw = doc.getTextWidth(SOP_META.title);
   doc.setFontSize(9);
   doc.setTextColor(...C.muted);
-  doc.text(
-    `${weekLabel(walk.isoYear, walk.week)}  ·  Status: ${walk.status === 'closed' ? 'abgeschlossen' : 'Entwurf'}`,
-    W - MR,
-    y + 8,
-    { align: 'right' },
-  );
+  doc.text('Formular', ML + tw + 2.5, y + 8);
   y += 13;
 
   // ── 1. Rundgangdaten ────────────────────────────────────────────────
@@ -170,7 +251,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     body: [
       [label('Datum'), formatDate(walk.date), label('Kalenderwoche'), `KW ${walk.week} / ${walk.isoYear}`],
       [label('Durchgeführt von'), walk.inspector, label('Uhrzeit'), walk.time],
-      [label('Begleitperson'), walk.companion, label('Bereich'), walk.area],
+      [label('Begleitperson'), { content: walk.companion, colSpan: 3 }],
       [label('Rundgangsart'), { content: '', colSpan: 3, styles: { minCellHeight: 6.5 } }],
       [label('Offene Punkte\nVorwoche'), { content: openText || 'keine', colSpan: 3 }],
     ],
@@ -182,13 +263,11 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
       doc.setTextColor(...C.ink);
-      for (const [type, text] of [
-        ['weekly', 'Wochenrundgang (A, C, F, G)'],
-        ['monthly', 'Monatsrundgang (A–G + M)'],
-      ] as const) {
+      for (const type of ['weekly', 'monthly'] as const) {
+        const text = TYPE_FORM_LABELS[type];
         checkbox(doc, x, by, walk.type === type);
         doc.text(text, x + 4, by + 2.3);
-        x += 4 + doc.getTextWidth(text) + 8;
+        x += 4 + doc.getTextWidth(text) + 10;
       }
     },
   });
@@ -196,163 +275,159 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
 
   // ── 2. Checkliste ───────────────────────────────────────────────────
   h1('2. Checkliste');
-  type Seg = [string, RGB, boolean] | 'arrow';
-  const drawSegs = (segs: Seg[], x: number, by: number) => {
-    doc.setFontSize(7.5);
-    for (const sg of segs) {
-      if (sg === 'arrow') {
-        doc.setDrawColor(...C.ink);
-        doc.setLineWidth(0.25);
-        doc.line(x + 0.4, by - 0.9, x + 3, by - 0.9);
-        doc.line(x + 2.2, by - 1.7, x + 3, by - 0.9);
-        doc.line(x + 2.2, by - 0.1, x + 3, by - 0.9);
-        x += 3.6;
-        continue;
-      }
-      const [t, col, bold] = sg;
-      doc.setFont('helvetica', bold ? 'bold' : 'normal');
-      doc.setTextColor(...col);
-      doc.text(t, x, by);
-      x += doc.getTextWidth(t);
-    }
-  };
-  const legend: Seg[][][] = [
+  const legend: Seg[][] = [
     [
-      [
-        ['OK', C.green, true],
-        [' = in Ordnung   ', C.ink, false],
-        ['Nicht OK', C.red, true],
-        [' = Mangel ', C.ink, false],
-        'arrow',
-        [' Kapitel 4 (Mangel-Nr. eintragen)   ', C.ink, false],
-      ],
-      [
-        ['N/A', C.muted, true],
-        [' = nicht geprüft / nicht vorhanden', C.ink, false],
-      ],
+      { t: 'OK', color: C.green, style: 'bold' },
+      { t: ' = in Ordnung   ' },
+      { t: 'Mangel', color: C.red, style: 'bold' },
+      { t: ' = in Kapitel 4 erfassen (Punkt + Bereich)   ' },
+      { t: 'n.a.', color: C.muted, style: 'bold' },
+      { t: ' = nicht vorhanden / nicht begangen' },
     ],
     [
-      [
-        ['wöchentlich', C.green, true],
-        [': A, C, F, G   ', C.ink, false],
-        ['monatlich', C.orange, true],
-        [' (erster Rundgang im Monat): zusätzlich B, D, E und M', C.ink, false],
-      ],
+      { t: 'Digital: Feld anklicken und Wert wählen · Ausgedruckt: ', color: C.muted, style: 'italic' },
+      { sym: 'check' },
+      { t: ' = OK, ', color: C.muted, style: 'italic' },
+      { sym: 'cross' },
+      { t: ' = Mangel, ', color: C.muted, style: 'italic' },
+      { sym: 'dash' },
+      { t: ' = n.a.', color: C.muted, style: 'italic' },
     ],
   ];
+  const LEG_W = CW - 29 - 2.8;
+  const legSizes = [7.5, 6.5];
+  const legLines = legend.map((l, i) => richText(doc, l, 0, 0, LEG_W, legSizes[i], 3.2, false));
   autoTable(doc, {
     ...tableBase,
     startY: y,
-    styles: { ...tableBase.styles, fontSize: 7.5 },
-    body: [
-      [label('Bewertung'), { content: '', styles: { minCellHeight: 8 } }],
-      [label('Rhythmus'), { content: '', styles: { minCellHeight: 5 } }],
-    ],
+    body: [[label('Bewertung'), { content: '', styles: { minCellHeight: (legLines[0] + legLines[1]) * 3.2 + 2.6 } }]],
     columnStyles: { 0: { cellWidth: 29 } },
     didDrawCell: (d: CellHookData) => {
       if (d.section !== 'body' || d.column.index !== 1) return;
-      const lines = legend[d.row.index];
-      lines.forEach((segs, i) => drawSegs(segs, d.cell.x + 1.4, d.cell.y + 3.6 + i * 3.4));
+      let ly = d.cell.y + 3.6;
+      legend.forEach((segs, i) => {
+        ly += (richText(doc, segs, d.cell.x + 1.4, ly, LEG_W, legSizes[i], 3.2) - 0) * 3.2;
+      });
     },
   });
-  y = lastY(doc) + 5;
+  y = lastY(doc) + 4;
 
-  const defectNrs = (itemId: string) =>
-    defects
-      .filter((d) => d.itemId === itemId)
-      .map((d) => d.nr)
-      .join(', ');
-  type RowMeta = { kind: 'section'; title: string; rhythm: 'weekly' | 'monthly'; legal: string } | { kind: 'item'; id: string } | { kind: 'free' };
-  const meta: RowMeta[] = [];
-  const body: RowInput[] = [];
-  for (const s of visibleSections(walk.type)) {
-    meta.push({ kind: 'section', title: `${s.id}   ${sopTitle(s.title)}`, rhythm: s.rhythm, legal: s.legal.join(' · ') });
-    body.push([{ content: '', colSpan: 6, styles: { fillColor: C.fillSection, minCellHeight: 5.2 } }]);
-    for (const it of s.items) {
-      if (it.freeText) {
-        meta.push({ kind: 'free' });
-        body.push([it.id, { content: walk.observations || '–', colSpan: 5 }]);
-        continue;
-      }
-      meta.push({ kind: 'item', id: it.id });
-      body.push([it.id, it.text, '', '', '', defectNrs(it.id)]);
-    }
-  }
-  const ratingCols = { 2: 'ok', 3: 'nok', 4: 'na' } as const;
+  // 2.1 Matrix: Punkt x Bereich
+  h3(WEEKLY_TITLE, 40);
+  const AREA_W = 14.2;
+  const matrixHead = ['Nr.', 'Kontrollpunkt', ...AREAS.map((a) => AREA_HEADS[a.id] ?? a.label)];
+  const areaOfCol = (col: number) => AREAS[col - 2]?.id;
+  const areaCols = Object.fromEntries(AREAS.map((_, i) => [i + 2, { cellWidth: AREA_W }]));
   autoTable(doc, {
     ...tableBase,
     startY: y,
     showHead: 'everyPage',
-    styles: { ...tableBase.styles, cellPadding: 0.9 },
-    head: [['Nr.', 'Kontrollpunkt', 'OK', 'Nicht\nOK', 'N/A', 'Mangel-Nr.']],
-    body,
-    headStyles: { ...tableBase.headStyles, fontSize: 7.5, halign: 'center' },
+    styles: { ...tableBase.styles, cellPadding: 0.9, fontSize: 7.8 },
+    head: [matrixHead],
+    body: WEEKLY_ITEMS.map((it) => [it.id, it.text, ...AREAS.map(() => '')]),
+    headStyles: { ...tableBase.headStyles, fontSize: 5.6, halign: 'center' },
     columnStyles: {
-      0: { cellWidth: 10, fontStyle: 'bold', fontSize: 7, halign: 'center' },
-      1: { fontSize: 8.5 },
-      2: { cellWidth: 12, fillColor: C.fillOk },
-      3: { cellWidth: 12, fillColor: C.fillNok },
-      4: { cellWidth: 12, fillColor: C.fillNa },
-      5: { cellWidth: 17, halign: 'center', fontStyle: 'bold', textColor: C.red },
+      0: { cellWidth: 9, fontStyle: 'bold', fontSize: 7, halign: 'center' },
+      ...areaCols,
     },
     didParseCell: (d: CellHookData) => {
       if (d.section === 'head') {
-        const i = d.column.index;
-        if (i === 1) d.cell.styles.halign = 'left';
-        if (i === 2) Object.assign(d.cell.styles, { fillColor: C.fillOkHead, textColor: C.green });
-        if (i === 3) Object.assign(d.cell.styles, { fillColor: C.fillNokHead, textColor: C.red, fontSize: 6.5 });
-        if (i === 4) Object.assign(d.cell.styles, { fillColor: C.fillLabel, textColor: C.muted });
-        if (i === 5) d.cell.styles.fontSize = 6.5;
+        if (d.column.index === 1) Object.assign(d.cell.styles, { halign: 'left', fontSize: 7.5 });
+        if (d.column.index === 0) d.cell.styles.fontSize = 6.5;
         return;
       }
-      const m = meta[d.row.index];
-      if (m?.kind === 'free' && d.column.index === 1 && !walk.observations) d.cell.styles.textColor = C.muted;
+      const area = areaOfCol(d.column.index);
+      if (area && walk.ratings[cellKey(WEEKLY_ITEMS[d.row.index].id, area)] === 'mangel') d.cell.styles.fillColor = C.fillNok;
     },
     didDrawCell: (d: CellHookData) => {
       if (d.section !== 'body') return;
-      const m = meta[d.row.index];
-      if (!m) return;
-      if (m.kind === 'section' && d.column.index === 0) {
-        const cy = d.cell.y + d.cell.height / 2 + 1.1;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.5);
-        doc.setTextColor(...C.heading);
-        doc.text(m.title, d.cell.x + 2, cy);
-        const tw = doc.getTextWidth(m.title);
-        doc.setFontSize(6.5);
-        doc.setTextColor(...(m.rhythm === 'weekly' ? C.green : C.orange));
-        doc.text(`· ${m.rhythm === 'weekly' ? 'wöchentlich' : 'monatlich'}`, d.cell.x + 2 + tw + 2.5, cy);
+      const area = areaOfCol(d.column.index);
+      if (!area) return;
+      const key = cellKey(WEEKLY_ITEMS[d.row.index].id, area);
+      const r = walk.ratings[key];
+      const cx = d.cell.x + d.cell.width / 2;
+      const cy = d.cell.y + d.cell.height / 2;
+      if (!r) {
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6);
-        doc.setTextColor(...C.muted);
-        if (m.legal) doc.text(m.legal, d.cell.x + d.cell.width - 1.5, cy, { align: 'right' });
+        doc.setFontSize(7);
+        doc.setTextColor(...C.grey);
+        doc.text('…', cx, cy + 0.6, { align: 'center' });
         return;
       }
-      if (m.kind === 'item' && d.column.index in ratingCols) {
-        const key = ratingCols[d.column.index as 2 | 3 | 4];
-        const color = key === 'ok' ? C.green : key === 'nok' ? C.red : C.muted;
-        checkbox(doc, d.cell.x + d.cell.width / 2 - 1.4, d.cell.y + d.cell.height / 2 - 1.4, walk.ratings[m.id] === key, color);
+      const nrs = r === 'mangel' ? defectsForCell(key, defects).map((x) => x.nr) : [];
+      const sx = nrs.length ? cx - 2 : cx;
+      symbol(doc, RATING_SYM[r], sx, cy, 2.6);
+      if (nrs.length) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6);
+        doc.setTextColor(...C.red);
+        doc.text(nrs.join(','), sx + 2.1, cy + 1);
       }
     },
   });
-  y = lastY(doc) + 7;
+  y = lastY(doc) + 5;
+
+  // 2.2 Monatlich
+  if (walk.type === 'monthly') {
+    h3(MONTHLY_TITLE, 60);
+    const ratingCols = { 2: 'ok', 3: 'mangel', 4: 'na' } as const;
+    const areasText = (itemId: string) =>
+      defectsForCell(itemId, defects)
+        .map((x) => `${areaLabel(x.area)} (Nr. ${x.nr})`)
+        .join('\n');
+    autoTable(doc, {
+      ...tableBase,
+      startY: y,
+      showHead: 'everyPage',
+      styles: { ...tableBase.styles, cellPadding: 0.9, fontSize: 7.8 },
+      head: [['Nr.', 'Kontrollpunkt', 'OK', 'Mangel', 'n.a.', 'Bereich']],
+      body: MONTHLY_ITEMS.map((it) => [it.id, it.text, '', '', '', areasText(it.id)]),
+      headStyles: { ...tableBase.headStyles, fontSize: 6.5, halign: 'center' },
+      columnStyles: {
+        0: { cellWidth: 9, fontStyle: 'bold', fontSize: 7, halign: 'center' },
+        2: { cellWidth: 10 },
+        3: { cellWidth: 11.5 },
+        4: { cellWidth: 10 },
+        5: { cellWidth: 40, fontSize: 6.5 },
+      },
+      didParseCell: (d: CellHookData) => {
+        if (d.section !== 'head') return;
+        const i = d.column.index;
+        if (i === 1) Object.assign(d.cell.styles, { halign: 'left', fontSize: 7.5 });
+        if (i === 2) Object.assign(d.cell.styles, { fillColor: C.fillOkHead, textColor: C.green });
+        if (i === 3) Object.assign(d.cell.styles, { fillColor: C.fillNokHead, textColor: C.red });
+        if (i === 4) Object.assign(d.cell.styles, { fillColor: C.fillLabel, textColor: C.muted, fontStyle: 'normal' });
+      },
+      didDrawCell: (d: CellHookData) => {
+        if (d.section !== 'body' || !(d.column.index in ratingCols)) return;
+        const key = ratingCols[d.column.index as 2 | 3 | 4];
+        const color = key === 'ok' ? C.green : key === 'mangel' ? C.red : C.muted;
+        const id = MONTHLY_ITEMS[d.row.index].id;
+        checkbox(doc, d.cell.x + d.cell.width / 2 - 1.4, d.cell.y + d.cell.height / 2 - 1.4, walk.ratings[id] === key, color);
+      },
+    });
+    y = lastY(doc) + 7;
+  } else {
+    h3(MONTHLY_TITLE, 12);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.muted);
+    doc.text(`Entfällt: ${TYPE_FORM_LABELS.weekly}.`, ML, y + 1.5);
+    y += 9;
+  }
 
   // ── 3. Ergebnis und Abschluss ───────────────────────────────────────
-  h1('3. Ergebnis und Abschluss');
-  const c = countRatings(walk);
+  h1('3. Ergebnis und Abschluss', 66); // Kapitel 3 nicht trennen (Zähler, Ergebnis, Unterschriften)
+  const dc = defectCounts(defects);
   autoTable(doc, {
     ...tableBase,
     startY: y,
     body: [
       [
-        label('Kontrolliert'),
-        { content: String(c.checked), styles: { halign: 'center' } },
-        { content: 'OK', styles: { fontStyle: 'bold', fillColor: C.fillOk, textColor: C.green } },
-        { content: String(c.ok), styles: { halign: 'center' } },
-        { content: 'Nicht OK', styles: { fontStyle: 'bold', fillColor: C.fillNok, textColor: C.red } },
-        { content: String(c.nok), styles: { halign: 'center' } },
-        { content: 'N/A', styles: { fontStyle: 'bold', fillColor: C.fillNa, textColor: C.muted } },
-        { content: String(c.na), styles: { halign: 'center' } },
+        label('Anzahl Mängel'),
+        { content: String(dc.total), styles: { halign: 'center' } },
+        { content: 'davon kritisch (K)', styles: { fontStyle: 'bold', fillColor: C.fillLabel, textColor: C.red } },
+        { content: String(dc.critical), styles: { halign: 'center', textColor: dc.critical ? C.red : C.ink, fontStyle: dc.critical ? 'bold' : 'normal' } },
       ],
     ],
   });
@@ -373,7 +448,6 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     },
   });
   y = lastY(doc) + 3;
-  ensure(30);
   autoTable(doc, {
     ...tableBase,
     startY: y,
@@ -411,26 +485,18 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
 
   ensure(60);
   h1('4. Mängel und Massnahmen');
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.ink);
-  let px = ML;
-  for (const [t, col] of [
-    ['Prio: ', C.ink],
-    ['K', C.red],
-    [' sofort · ', C.ink],
-    ['H', C.orange],
-    [' 48 Std. · ', C.ink],
-    ['M', C.amber],
-    [' 1 Woche · ', C.ink],
-    ['N', C.ink],
-    [' 1 Monat (Richtwerte) · weitere Mängel: Zeile kopieren · Nachkontrolle im Excel-Register', C.ink],
-  ] as [string, RGB][]) {
-    doc.setTextColor(...col);
-    doc.text(t, px, y);
-    px += doc.getTextWidth(t);
-  }
-  y += 2.5;
+  const prioSegs: Seg[] = [
+    { t: 'Prio: ', style: 'bold' },
+    { t: 'K', color: C.red, style: 'bold' },
+    { t: ' sofort · ' },
+    { t: 'H', color: C.orange, style: 'bold' },
+    { t: ' 48 Std. · ' },
+    { t: 'M', color: C.amber, style: 'bold' },
+    { t: ' 1 Woche · ' },
+    { t: 'N', style: 'bold' },
+    { t: ' 1 Monat (Richtwerte) · weitere Mängel: Zeile kopieren · Nachkontrolle im Excel-Register' },
+  ];
+  y += 3.2 * richText(doc, prioSegs, ML, y, CW, 7, 3.2) - 0.5;
 
   const PHOTO_W = 44;
   const PHOTO_H = 31;
@@ -452,19 +518,21 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     ...tableBase,
     startY: y,
     showHead: 'everyPage',
-    head: [['Nr. / Pkt.', 'Mangel / Gefahr', 'Massnahme', 'Verantw. / Frist / Prio', 'Foto']],
+    head: [['Nr. / Pkt. / Bereich', 'Mangel / Gefahr', 'Massnahme', 'Verantw. / Frist / Prio', 'Foto']],
     headStyles: { ...tableBase.headStyles, fontSize: 7.5, halign: 'center' },
     body: defectBody,
     rowPageBreak: 'avoid',
     styles: { ...tableBase.styles, valign: 'top', fontSize: 8 },
     columnStyles: {
-      0: { cellWidth: 15 },
-      3: { cellWidth: 27, fontSize: 7.5 },
+      0: { cellWidth: 21 },
+      1: { cellWidth: (CW - 21 - 26 - PHOTO_W - 3) / 2 },
+      2: { cellWidth: (CW - 21 - 26 - PHOTO_W - 3) / 2 },
+      3: { cellWidth: 26, fontSize: 7.5 },
       4: { cellWidth: PHOTO_W + 3, fontSize: 6, textColor: C.muted, halign: 'center' },
     },
     didParseCell: (d: CellHookData) => {
       if (d.section === 'body' && defects.length) d.cell.styles.minCellHeight = PHOTO_H + 3;
-      if (d.section === 'head' && d.column.index === 3) d.cell.styles.fontSize = 6.5;
+      if (d.section === 'head' && (d.column.index === 0 || d.column.index === 3)) d.cell.styles.fontSize = 6;
     },
     didDrawCell: (d: CellHookData) => {
       if (d.section !== 'body' || !defects.length) return;
@@ -481,9 +549,14 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
         doc.setFontSize(6.5);
         doc.setTextColor(...C.muted);
         doc.text('Pkt.', x + 1.5, top + 10);
+        doc.text('Bereich', x + 1.5, top + 17.5);
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(...C.ink);
         doc.setFontSize(8);
         doc.text(def.itemId, x + 1.5, top + 13.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.text(doc.splitTextToSize(areaLabel(def.area), d.cell.width - 2.5), x + 1.5, top + 21);
       }
       if (d.column.index === 3) {
         let bx = x + 1.4;
@@ -523,7 +596,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     const ps = photosOf(d.id).slice(1);
     if (!ps.length) continue;
     ensure(50);
-    h3(`Weitere Fotos zu Mangel Nr. ${d.nr} (${d.itemId})`);
+    h3(`Weitere Fotos zu Mangel Nr. ${d.nr} (${d.itemId} / ${areaLabel(d.area)})`);
     let col = 0;
     let rowH = 0;
     for (const p of ps) {
@@ -548,28 +621,34 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   }
 
   // ── 5. Hinweise und Dokumentenlenkung ───────────────────────────────
-  ensure(95);
+  ensure(150);
   h1('5. Hinweise und Dokumentenlenkung');
   autoTable(doc, {
     ...tableBase,
     startY: y,
     styles: { ...tableBase.styles, fontSize: 7.5, valign: 'top' },
     body: [
-      [
-        label('Ablauf'),
-        '1. Vorlage öffnen (Doppelklick), Kapitel 1 ausfüllen.  2. Checkliste prüfen, Mängel mit Foto in Kapitel 4.\n3. Als „HSE-Rundgang_JJJJ-KWxx“ speichern, PDF exportieren, im Excel-Register eintragen (dort auch Prüftermine Quartal/Jahr).',
-      ],
+      [label('Ablauf'), PROCEDURE_TEXT.join('\n')],
+      [label('Nicht im Rundgang'), NOT_IN_WALK_TEXT],
     ],
     columnStyles: { 0: { cellWidth: 29 } },
   });
   y = lastY(doc) + 4;
-  h3('Referenzen');
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
+  h3('Grundlagen je Kontrollpunkt', 50);
+  autoTable(doc, {
+    ...tableBase,
+    startY: y,
+    styles: { ...tableBase.styles, fontSize: 6.5, cellPadding: 1.1 },
+    body: LEGAL_BASES.map((l) => [l.points, l.text]),
+    columnStyles: { 0: { cellWidth: 29, fontStyle: 'bold', fillColor: C.fillLabel } },
+  });
+  y = lastY(doc) + 1;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(6.5);
   doc.setTextColor(...C.muted);
-  const refLines = doc.splitTextToSize(SOP_REFERENCES_TEXT, CW - 1);
-  doc.text(refLines, ML, y + 1);
-  y += refLines.length * 3 + 4;
+  const foot = doc.splitTextToSize(LEGAL_FOOTNOTE, CW);
+  doc.text(foot, ML, y + 2.6);
+  y += foot.length * 2.8 + 4;
 
   const lined = {
     ...tableBase,
@@ -587,27 +666,21 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
       }
     },
   };
-  ensure(30);
-  h3('Genehmigung');
+  h3('Genehmigung', 30);
   autoTable(doc, {
     ...lined,
     startY: y,
     head: [['Name', 'Position', 'Unterschrift/Datum']],
     headStyles: { ...lined.headStyles, halign: 'center' },
-    body: [
-      [SOP_META.author.replace(/ \(.*\)$/, ''), 'HSE (Ersteller)', ''],
-      ['', '', ''],
-    ],
+    body: [...APPROVAL.map((a) => [a.name, a.position, '']), ['', '', '']],
   });
   y = lastY(doc) + 5;
-  ensure(20);
-  h3('Änderungsverzeichnis');
+  h3('Änderungsverzeichnis', 20);
   autoTable(doc, {
     ...lined,
     startY: y,
-    tableWidth: 92,
     head: [['Versionsnummer', 'Beschreibung']],
-    body: [[`V${SOP_META.version}`, `Erstversion vom ${formatDate(SOP_META.validFrom)}`]],
+    body: CHANGE_LOG.map((c) => [c.version, c.description]),
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 37 } },
   });
 
@@ -615,6 +688,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   const pages = doc.getNumberOfPages();
   const logoW = 28.3;
   const logoH = logoW * QPS_LOGO_RATIO;
+  const footLeft = `${fileBaseName} · ${walk.status === 'closed' ? 'abgeschlossen' : 'Entwurf'}`;
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
     const hy = 12.5;
@@ -654,7 +728,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(...C.muted);
-    doc.text(fileBaseName, ML, H - 10);
+    doc.text(footLeft, ML, H - 10);
   }
   return doc;
 }
