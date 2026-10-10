@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FORM_AREAS } from '../../src/data/checklist';
 import { DEFAULT_REGISTER_SETTINGS } from '../../src/data/register';
 import type { Defect, Walk } from '../../src/lib/types';
-import { deriveInspection, defectDaysOpen, roundRegisterRows, suggestedResult, validDefectDue } from '../../src/lib/register';
+import { deriveInspection, defectDaysOpen, overviewMetrics, roundRegisterRows, suggestedResult, validDefectDue } from '../../src/lib/register';
 import { addDays } from '../../src/lib/dates';
 import { countRatings, defectAreaValid, firstWalkOfMonth, mangelWithoutDefect, newMangelId, requiredRatingKeys, validateForClose } from '../../src/lib/walk';
 
@@ -78,5 +78,20 @@ describe('Workbook deadline and inspection calculations', () => {
     expect(defectDaysOpen('2026-10-01', makeDefect(), '2026-10-08')).toBe(7);
     const rows = roundRegisterRows([makeWalk()], [makeDefect()], DEFAULT_REGISTER_SETTINGS);
     expect(rows[0]).toMatchObject({ defectCount: 1, criticalCount: 0, openCount: 1, pdfFilename: 'HSE-Rundgang_2026-10-08_HSE-RG-2026-001.pdf' });
+  });
+
+  it('groups legacy area labels under the three checklist headings on the dashboard', () => {
+    const defects = [
+      makeDefect({ id: 'old-engineering', area: 'engineering' }),
+      makeDefect({ id: 'old-qmeasure', area: 'qmeasure', status: 'done' }),
+      makeDefect({ id: 'labs', area: 'qlabs' }),
+      makeDefect({ id: 'old-xtec', area: 'xtec-werkstatt' }),
+    ];
+    const metrics = overviewMetrics([], defects, DEFAULT_REGISTER_SETTINGS, '2026-10-08');
+    expect(metrics.defectsByArea.map(({ area, total, open, done }) => ({ area, total, open, done }))).toEqual([
+      { area: 'QPS', total: 2, open: 1, done: 1 },
+      { area: 'QLabs', total: 1, open: 1, done: 0 },
+      { area: 'xTec', total: 1, open: 1, done: 0 },
+    ]);
   });
 });

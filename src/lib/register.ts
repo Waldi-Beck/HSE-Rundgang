@@ -1,4 +1,4 @@
-import { areaLabel } from '../data/checklist';
+import { FORM_AREAS, areaLabel } from '../data/checklist';
 import { INITIAL_INSPECTIONS, PRIORITY_KEY_TO_TEXT, PRIORITIES, RESULT_LABELS } from '../data/register';
 import { addDays, addMonths, durationMinutes, isOverdue, toISODate } from './dates';
 import type { Defect, DerivedInspection, Inspection, RegisterSettings, RoundRegisterRow, Walk } from './types';
@@ -26,6 +26,14 @@ export function deriveInspection(inspection: Inspection, today = toISODate(new D
     status = today > nextDue ? 'überfällig' : (new Date(`${nextDue}T12:00:00`).getTime() - new Date(`${today}T12:00:00`).getTime()) / 864e5 <= 30 ? 'bald fällig' : 'ok';
   }
   return { ...inspection, nextDue, status };
+}
+
+function dashboardArea(area: string, settings: RegisterSettings): string {
+  const normalized = area.trim().toLocaleLowerCase();
+  if (['qps', 'engineering', 'qmeasure'].includes(normalized)) return 'QPS';
+  if (normalized === 'qlabs') return 'QLabs';
+  if (['xtec', 'xtec lager', 'xtec werkstatt', 'xtec-lager', 'xtec-werkstatt'].includes(normalized)) return 'xTec';
+  return areaLabel(area, settings.areas);
 }
 
 export function inspectionSeeds(now = new Date()): Inspection[] {
@@ -107,8 +115,10 @@ export function overviewMetrics(
   const currentMonth = today.slice(0, 7);
   const currentMonthWalks = ordered.filter((walk) => walk.date.slice(0, 7) === currentMonth);
   const monthlyCheckedThisMonth = currentMonthWalks.some((walk) => walk.monthlyChecked);
-  const defectsByArea = settings.areas.map((area) => {
-    const inArea = defects.filter((defect) => areaLabel(defect.area, settings.areas) === area);
+  const mainAreas: string[] = FORM_AREAS.map((area) => area.label);
+  const extraAreas = [...new Set(defects.map((defect) => dashboardArea(defect.area, settings)))].filter((area) => !mainAreas.includes(area));
+  const defectsByArea = [...mainAreas, ...extraAreas].map((area) => {
+    const inArea = defects.filter((defect) => dashboardArea(defect.area, settings) === area);
     return {
       area,
       total: inArea.length,

@@ -177,10 +177,10 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     ...common,
     startY: y,
     showHead: 'everyPage',
-    styles: { ...common.styles, fontSize: 5.8, cellPadding: 0.4, minCellHeight: 4.4 },
+    styles: { ...common.styles, fontSize: 6.8, cellPadding: 0.6, minCellHeight: 5.4 },
     head: [head],
     body: WEEKLY_ITEMS.map((item) => [item.id, item.text, ...FORM_AREAS.map(() => '')]),
-    headStyles: { ...common.headStyles, fontSize: 5.3 },
+    headStyles: { ...common.headStyles, fontSize: 6.2 },
     columnStyles: { 0: { cellWidth: 8, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: pointCol }, ...Object.fromEntries(FORM_AREAS.map((_, index) => [index + 2, { cellWidth: areaW, halign: 'center' }])) },
     didParseCell: (cell) => {
       if (cell.section !== 'body') return;
@@ -206,7 +206,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
         doc.text('…', cx, cy + 1, { align: 'center' });
       } else {
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6.8);
+        doc.setFontSize(7.2);
         doc.setTextColor(...(rating === 'ok' ? GREEN : rating === 'mangel' ? RED : MUTED));
         doc.text(RATING_LABELS[rating], cx, cy + 1.1, { align: 'center' });
         const linked = defects.filter((defect) => defect.itemId === item.id && defect.area === area.id);

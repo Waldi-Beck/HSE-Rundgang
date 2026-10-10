@@ -16,7 +16,7 @@ export const FORM_SUBTITLE = 'Formular';
 export const INTERVAL_NOTICE = 'Intervall: mindestens alle 2 Wochen (max. 14 Tage), bei Bedarf häufiger.';
 export const NOT_IN_WALK_TEXT = 'Nicht im Rundgang: Geräteprüfungen (Laser inkl. Schutzbrille, Maschinen, Cobots, LOTO, Elektrogeräte) → Geräte-SOPs, Wartung, Excel „Prüftermine“.';
 export const FORM_INTRO = `${INTERVAL_NOTICE}   ${NOT_IN_WALK_TEXT}`;
-export const RATING_LEGEND = 'OK = in Ordnung   Mangel = in Kapitel 3 erfassen (Punkt + Bereich)   n.a. = nicht vorhanden / nicht begangen / Digital: Feld anklicken und Wert wählen · Ausgedruckt: ✓ = OK, ✗ = Mangel, – = n.a.';
+export const RATING_LEGEND = 'Bewertung   OK = in Ordnung   Mangel = in Kapitel 3 erfassen (Punkt + Bereich)   n.a. = nicht vorhanden / nicht begangen';
 export const PRIORITY_NOTE = 'Prio: K sofort · H 48 Std. · M 1 Woche · N 1 Monat (Richtwerte) · weitere Mängel: Zeile kopieren · Nachkontrolle im Excel-Register';
 export const MONTHLY_NOTICE = '2.2 Monatlich – zusätzlich beim ersten Rundgang im Kalendermonat (9 Punkte)';
 export const WEEKLY_NOTICE = '2.1 Bei jedem Rundgang – alle Räume (15 Punkte je Bereich)';
