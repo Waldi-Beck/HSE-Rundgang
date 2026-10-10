@@ -8,7 +8,7 @@ Reading this as: mobile-first, regulated workplace-inspection product for staff 
 
 ## Summary
 
-Replace the older 16x6 W matrix and simple defect register with the current Word template (R1-R15 in five areas plus optional M1-M9) and a local register equivalent to the workbook. Keep data offline in IndexedDB, retain annual immutable round numbers, add follow-up lifecycle and device inspection dates, and export XLSX/JSON/PDF client-side.
+Replace the older checklist with the supplied reference matrix (R1-R15 in QPS, QLabs, xTec plus optional M1-M9). Keep data offline in IndexedDB, retain annual immutable round numbers, add defect follow-up and export XLSX/JSON/PDF client-side. Periodic Prüftermine remain in the separate workbook, not in app views or XLSX export.
 
 ## Technical Context
 
@@ -21,19 +21,19 @@ Replace the older 16x6 W matrix and simple defect register with the current Word
 
 ## Source Decisions
 
-1. Current form text/layout source is `QPS_HSE_00064_HSE_Rundgang_V1.0_Vorlage.dotx`; existing DOCX is old and is not modified.
+1. Current 2.1 checklist layout and area source is the supplied reference image: one matrix with QPS, QLabs and xTec. Existing office sources are read-only.
 2. Excel formula semantics and seed rows are captured from `HSE_Rundgang_Register.xlsx` sheets Übersicht, Rundgänge, Mängel, Prüftermine, Grundlagen, Listen. The source files remain read-only.
 3. SOP_META document ID, version, and valid-from remain fixed; title becomes exactly `HSE Rundgang`.
 4. Preserve current annual walk counter and docNr identity. New database upgrade may reset incompatible old rating data only when no safe mapping exists; it must not reset counters or crash.
 
 ## Architecture
 
-- `src/data/checklist.ts`: single versioned data definition for five inspection areas, R1-R15, M1-M9, legal bases and literal form copy.
+- `src/data/checklist.ts`: single versioned data definition for three weekly matrix areas, R1-R15, M1-M9, legal bases and literal form copy.
 - `src/data/register.ts`: Excel seed lists, priority days, initial inspection proposals and result/status values.
 - `src/lib/walk.ts`, `dates.ts`, `register.ts`: pure rating, duration, interval, deadline, ID and dashboard calculations.
 - `src/db.ts`: versioned schema, migrations, seed data, repository transactions.
-- Existing WalkPage becomes the form flow: Rundgangdaten, room-by-room checklist, defects, close.
-- RegisterPage has Rundgänge, Mängel, Prüftermine; DashboardPage becomes workbook Übersicht; SettingsPage edits Listen values.
+- Existing WalkPage becomes the form flow: Rundgangdaten, checklist matrix, defects, close.
+- RegisterPage has Rundgänge and Mängel; DashboardPage summarizes walks and defects; SettingsPage edits applicable list values. Inspection table data stays available for compatible local backups, but is not shown.
 - `src/lib/pdf.ts`: two-page-first PDF with continuation for many defects/photos, matching the new template and exact current SOP metadata.
 - `src/lib/excel.ts`: XLSX builder with the 3 register sheets and workbook column order.
 - `src/lib/backup.ts`: JSON backup version 4, collision-safe import including inspections/settings.
@@ -44,7 +44,7 @@ Replace the older 16x6 W matrix and simple defect register with the current Word
 2. Replace checklist and types, pure calculations, and Dexie migration/seeding. Run typecheck/unit tests.
 3. Rebuild walk flow, defects follow-up, overview/register/settings pages. Run typecheck/unit tests.
 4. Build PDF/XLSX/JSON exports and output-generation tests. Run unit tests/build.
-5. Add full Playwright path; run with installed browser, no install command.
+5. Add full Playwright path for 45 weekly cells in the three matrix columns; run with installed browser, no install command.
 6. Generate example PDF/XLSX, render every PDF page for visual inspection, update README/CHANGELOG/screenshots, run all requested checks, attempt local commit without push.
 
 ## Risks and Mitigations

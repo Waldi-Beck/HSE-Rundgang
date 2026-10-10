@@ -17,7 +17,7 @@ Database `hse-rundgang`; neue Schema-Version nach bestehender Version 3. Tabelle
 | `inspector`, `companion` | string | durchgeführt von, Begleitperson |
 | `monthlyChecked` | boolean | Kästchen 2.2 geprüft; erster Monatstermin vorgeschlagen |
 | `openDefectSnapshot` | string[]/null | beim Abschluss fixierte offene Punkte des vorigen Rundgangs |
-| `ratings` | `Record<string, Rating>` | `R4@qlabs`, `M2@engineering`; Werte `ok`, `mangel`, `na` |
+| `ratings` | `Record<string, Rating>` | `R4@qlabs`, `R2@qps`, `M2@Engineering`; Werte `ok`, `mangel`, `na` |
 | `result` | ResultKey/null | vier Gesamtbewertungen |
 | `note` | string | Bemerkung fürs Rundgangregister |
 | `signature` | Signature | Durchführende/r, zum Abschluss Pflicht |
@@ -77,4 +77,4 @@ Gültige Frist: `newDue || due || addDays(walk.date, settings.priorityDays[prior
 
 ## Export
 
-JSON-Backupversion wird auf 4 erhöht und enthält alle sechs Tabellen plus Foto-Blobs als Data URL. XLSX enthält Arbeitsblätter Rundgänge, Mängel, Prüftermine mit Spaltenreihenfolge der Quelldatei; berechnete Registerwerte werden mitexportiert.
+JSON-Backupversion wird auf 4 erhöht und enthält Tabellen plus Foto-Blobs als Data URL, einschliesslich historischer Inspection-Daten zur Backup-Kompatibilität. Der App-XLSX enthält nur Rundgänge und Mängel; periodische Prüftermine bleiben im separaten Excel.

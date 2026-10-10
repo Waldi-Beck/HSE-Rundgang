@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { autoTable, type CellHookData, type RowInput } from 'jspdf-autotable';
 import { QPS_LOGO_PNG, QPS_LOGO_RATIO } from '../assets/qpsLogo';
-import { FORM_AREAS, FORM_SUBTITLE, FORM_TITLE, INTERVAL_NOTICE, MONTHLY_ITEMS, MONTHLY_NOTICE, NOT_IN_WALK_TEXT, PRIORITY_NOTE, RATING_LEGEND, SOP_META, WEEKLY_ITEMS, WEEKLY_NOTICE, areaLabel } from '../data/checklist';
+import { FORM_AREAS, FORM_SUBTITLE, FORM_TITLE, INTERVAL_NOTICE, MONTHLY_ITEMS, MONTHLY_NOTICE, NOT_IN_WALK_TEXT, PRIORITY_NOTE, RATING_LABELS, RATING_LEGEND, SOP_META, WEEKLY_ITEMS, WEEKLY_NOTICE, areaLabel } from '../data/checklist';
 import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../data/register';
 import { durationMinutes, formatDate, formatDuration } from './dates';
 import { blobToDataUrl } from './image';
@@ -171,7 +171,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   const head = ['Nr.', 'Kontrollpunkt', ...FORM_AREAS.map((area) => area.label)];
   const areaColStart = 2;
   const areaForColumn = (column: number) => FORM_AREAS[column - areaColStart];
-  const areaW = 18.5;
+  const areaW = 27.5;
   const pointCol = contentWidth - 8 - areaW * FORM_AREAS.length;
   autoTable(doc, {
     ...common,
@@ -205,7 +205,10 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
         doc.setTextColor(...MUTED);
         doc.text('…', cx, cy + 1, { align: 'center' });
       } else {
-        vectorMark(doc, rating, cx, cy, 2.8);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.8);
+        doc.setTextColor(...(rating === 'ok' ? GREEN : rating === 'mangel' ? RED : MUTED));
+        doc.text(RATING_LABELS[rating], cx, cy + 1.1, { align: 'center' });
         const linked = defects.filter((defect) => defect.itemId === item.id && defect.area === area.id);
         if (linked.length) {
           doc.setFont('helvetica', 'bold');

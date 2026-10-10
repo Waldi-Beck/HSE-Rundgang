@@ -12,6 +12,7 @@ export function RatingControl({
   label,
   value,
   disabled,
+  compact = false,
   onChange,
 }: {
   /** Bewertungsschlüssel, z. B. "W4@qlabs" (für Test-IDs) */
@@ -20,10 +21,11 @@ export function RatingControl({
   label?: string;
   value: Rating | undefined;
   disabled?: boolean;
+  compact?: boolean;
   onChange: (v: Rating | undefined) => void;
 }) {
   return (
-    <div role="radiogroup" aria-label={`Bewertung ${label ?? itemId}`} className="grid grid-cols-3 gap-1.5">
+    <div role="radiogroup" aria-label={`Bewertung ${label ?? itemId}`} className={`grid ${compact ? 'grid-cols-[0.85fr_1.5fr_0.85fr] gap-1' : 'grid-cols-3 gap-1.5'}`}>
       {OPTIONS.map((o) => {
         const checked = value === o.value;
         return (
@@ -35,7 +37,7 @@ export function RatingControl({
             data-testid={`rate-${itemId}-${o.value}`}
             disabled={disabled}
             onClick={() => onChange(checked ? undefined : o.value)}
-            className={`min-h-12 rounded-lg border text-[15px] font-medium transition-[transform,background-color] duration-100 active:scale-[0.97] disabled:cursor-not-allowed ${
+            className={`${compact ? 'min-h-9 min-w-0 whitespace-nowrap px-0 text-[11px]' : 'min-h-12 text-[15px]'} rounded-lg border font-medium transition-[transform,background-color] duration-100 active:scale-[0.97] disabled:cursor-not-allowed ${
               checked ? o.active : 'border-line-strong bg-surface text-ink'
             } ${disabled && !checked ? 'opacity-50' : ''}`}
           >

@@ -21,7 +21,7 @@ export interface Walk {
   inspector: string;
   companion: string;
   monthlyChecked: boolean;
-  /** R4@qlabs / M2@engineering -> status */
+  /** R4@qlabs / R2@qps / M2@Engineering -> status */
   ratings: Record<string, Rating>;
   /** One selected area per monthly checklist item M1-M9. */
   monthlyAreas: Record<string, string>;

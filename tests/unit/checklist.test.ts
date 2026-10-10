@@ -7,11 +7,11 @@ describe('Checklist source from current form and Excel Grundlagen', () => {
     expect(SOP_META).toMatchObject({ docId: 'QPS_HSE_00064', title: 'HSE Rundgang', version: '1.0', validFrom: '2026-10-05' });
   });
 
-  it('contains exactly fifteen R points in each of five areas and nine M points', () => {
-    expect(FORM_AREAS.map((area) => area.label)).toEqual(['Engineering', 'QLabs', 'QMeasure', 'xTec Lager', 'xTec Werkstatt']);
+  it('contains exactly fifteen R points in each of three areas and nine M points', () => {
+    expect(FORM_AREAS.map((area) => area.label)).toEqual(['QPS', 'QLabs', 'xTec']);
     expect(WEEKLY_ITEMS.map((item) => item.id)).toEqual(Array.from({ length: 15 }, (_, i) => `R${i + 1}`));
     expect(MONTHLY_ITEMS.map((item) => item.id)).toEqual(Array.from({ length: 9 }, (_, i) => `M${i + 1}`));
-    expect(WEEKLY_ITEMS.length * FORM_AREAS.length).toBe(75);
+    expect(WEEKLY_ITEMS.length * FORM_AREAS.length).toBe(45);
     expect(ALL_ITEMS).toHaveLength(24);
   });
 
@@ -23,6 +23,7 @@ describe('Checklist source from current form and Excel Grundlagen', () => {
     expect(ALL_ITEMS.every((item) => item.basis.trim().length > 0)).toBe(true);
     expect(new Set(ALL_ITEMS.map((item) => item.id)).size).toBe(24);
     expect(WEEKLY_ITEMS[3]).toMatchObject({ id: 'R4', text: 'Feuerlöscher am Platz und frei zugänglich', basis: 'VKF-Brandschutzvorschriften (BSV 2015)' });
+    expect(WEEKLY_ITEMS[8].text).toBe('Sicherheitszeichen vorhanden, richtig und gut sichtbar (Warn-, Gebots-, Verbotszeichen)');
     expect(MONTHLY_ITEMS[8].id).toBe('M9');
   });
 

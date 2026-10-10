@@ -33,6 +33,6 @@
 
 ## Notes
 
-- Previous revision's 16x6 checklist and CSV-only register are superseded by the current DOTX's R1-R15 x five areas and the Excel workbook's three register sheets.
+- Previous revisions are superseded by the current R1-R15 matrix with QPS, QLabs and xTec, plus optional M1-M9. Prüftermine remain outside the app; the in-app XLSX includes only Rundgänge and Mängel.
 - Excel formula behavior is restated as testable requirements for due-date precedence, status, overdue, round interval and monthly warnings.
 - Current change keeps document ID/version fixed while changing only the display title to `HSE Rundgang`.

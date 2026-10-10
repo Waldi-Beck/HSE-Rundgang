@@ -27,15 +27,15 @@ function makeDefect(patch: Partial<Defect> = {}): Defect {
 }
 
 describe('New checklist and closure', () => {
-  it('requires exactly 75 weekly ratings and adds nine only when 2.2 is checked', () => {
-    expect(requiredRatingKeys(false)).toHaveLength(75);
-    expect(requiredRatingKeys(true)).toHaveLength(84);
+  it('requires exactly 45 weekly ratings and adds nine only when 2.2 is checked', () => {
+    expect(requiredRatingKeys(false)).toHaveLength(45);
+    expect(requiredRatingKeys(true)).toHaveLength(54);
     expect(requiredRatingKeys(false).every((key) => /^R\d+@/.test(key))).toBe(true);
   });
 
   it('counts required ratings and verifies area-linked defects', () => {
-    const walk = makeWalk({ ratings: { 'R1@engineering': 'ok', 'R4@qlabs': 'mangel', M1: 'na' }, monthlyChecked: false });
-    expect(countRatings(walk)).toMatchObject({ total: 75, checked: 2, ok: 1, mangel: 1, na: 0 });
+    const walk = makeWalk({ ratings: { 'R1@qps': 'ok', 'R4@qlabs': 'mangel', M1: 'na' }, monthlyChecked: false });
+    expect(countRatings(walk)).toMatchObject({ total: 45, checked: 2, ok: 1, mangel: 1, na: 0 });
     expect(mangelWithoutDefect(walk, [makeDefect()])).toEqual([]);
     expect(mangelWithoutDefect(walk, [])).toEqual(['R4@qlabs']);
     expect(defectAreaValid(makeDefect())).toBe(true);

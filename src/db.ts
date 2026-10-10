@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import { FORM_AREAS, WEEKLY_ITEMS, type Rating } from './data/checklist';
 import { DEFAULT_REGISTER_SETTINGS } from './data/register';
 import { formatWalkNumber, isoWeek, parseWalkNumber, toISODate, toTime, createMangelId } from './lib/dates';
 import { inspectionSeeds } from './lib/register';
@@ -80,6 +81,38 @@ db.version(4)
     await Promise.all([tx.table('walks').clear(), tx.table('defects').clear(), tx.table('photos').clear()]);
     if (!settings) await tx.table('settings').put(DEFAULT_REGISTER_SETTINGS);
     if (!inspectionCount) await tx.table('inspections').bulkPut(inspectionSeeds());
+  });
+
+db.version(5)
+  .stores({
+    walks: 'id, date, status, &docNr',
+    defects: 'id, walkId, status, itemId, area, mangelId',
+    photos: 'id, defectId',
+    counters: '&year',
+    inspections: 'id, area',
+    settings: '&id',
+  })
+  .upgrade(async (tx) => {
+    const walks = await tx.table('walks').toArray() as Walk[];
+    const defects = await tx.table('defects').toArray() as Defect[];
+    const legacyTargets: Record<string, string> = {
+      engineering: 'qps', qmeasure: 'qps', 'xtec-lager': 'xtec', 'xtec-werkstatt': 'xtec',
+    };
+    const rank = { ok: 1, na: 2, mangel: 3 } as const;
+    await tx.table('walks').bulkPut(walks.map((walk) => {
+      const ratings = { ...walk.ratings };
+      for (const item of WEEKLY_ITEMS) {
+        for (const target of FORM_AREAS) {
+          const sourceIds = [target.id, ...Object.entries(legacyTargets).filter(([, mapped]) => mapped === target.id).map(([legacy]) => legacy)];
+          const candidates = sourceIds.map((area) => ratings[`${item.id}@${area}`]).filter((value): value is Rating => !!value);
+          const selected = candidates.sort((a, b) => rank[b] - rank[a])[0];
+          for (const source of sourceIds) delete ratings[`${item.id}@${source}`];
+          if (selected) ratings[`${item.id}@${target.id}`] = selected;
+        }
+      }
+      return { ...walk, ratings };
+    }));
+    await tx.table('defects').bulkPut(defects.map((defect) => ({ ...defect, area: legacyTargets[defect.area] ?? defect.area })));
   });
 
 export const uid = () => crypto.randomUUID();

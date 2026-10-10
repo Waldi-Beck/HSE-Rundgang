@@ -103,7 +103,7 @@ describe('Rundgang-Nummer', () => {
 
     await db.open();
     expect(await db.walks.count()).toBe(0);
-    expect(db.verno).toBe(4);
+    expect(db.verno).toBe(5);
     expect(await db.inspections.count()).toBe(15);
     expect(await db.settings.get('app')).toMatchObject({ maxIntervalDays: 14 });
     const fresh = await createWalk(new Date(2026, 9, 6));

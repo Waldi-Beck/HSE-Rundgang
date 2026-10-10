@@ -31,6 +31,16 @@ const walk: Walk = {
 };
 
 describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
+  it('druckt die neue 2.1-Matrix mit den drei Bereichen und Textbewertungen', async () => {
+    const pdf = await buildReportPdf({
+      walk: { ...walk, ratings: { 'R1@qps': 'ok', 'R1@qlabs': 'mangel', 'R1@xtec': 'na' } },
+      defects: [], photos: [], openFromPrevious: [], fileBaseName: 'matrix-test',
+      settings: { id: 'app', areas: ['Engineering', 'QLabs'], priorityDays: { K: 0, H: 2, M: 7, N: 30 }, maxIntervalDays: 14 },
+    });
+    const output = pdf.output();
+    for (const text of ['QPS', 'QLabs', 'xTec', 'OK', 'Mangel', 'n.a.']) expect(output).toContain(text);
+  });
+
   it('druckt QPS-Logo und unveränderte SOP-Dokumenten-ID auf mindestens drei Seiten', async () => {
     const api = jsPDF.API as unknown as { addImage: (...args: unknown[]) => unknown };
     const addImage = vi.spyOn(api, 'addImage');

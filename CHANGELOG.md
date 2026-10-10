@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-10: Checklistenmatrix gemäss Referenz
+
+- Kapitel 2.1 als gemeinsame Tabelle mit den Spalten QPS, QLabs und xTec; 15 Prüfpunkte je Bereich (45 Bewertungen).
+- Bewertungslegende, kompakte Eingabe je Tabellenzelle und „Rest OK“ je Spalte; PDF-Ausgabe mit denselben drei Spalten und Textwerten OK/Mangel/n.a.
+- Datenbankmigration führt gespeicherte Engineering/QMeasure- und xTec-Lager/Werkstatt-Bewertungen ohne Verlust zusammen; bei Konflikten bleibt die strengste Bewertung erhalten.
+
 ## Unveröffentlicht: Neues Formular und Register als Excel-Ersatz
 
 - Aktuelles Formular aus der bereitgestellten DOTX: R1-R15 in fünf Räumen, optionale Monatspunkte M1-M9, Beginn/Ende/Dauer, Monatsprüfungskennzeichen und automatische Übernahme offener Mängel.

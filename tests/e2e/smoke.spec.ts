@@ -4,15 +4,14 @@ import path from 'node:path';
 
 const shots = path.resolve('docs/screenshots');
 const fixture = path.resolve('tests/fixtures/mangel-fluchtweg.jpg');
-const ROOMS = ['engineering', 'qlabs', 'qmeasure', 'xtec-lager', 'xtec-werkstatt'];
+const ROOMS = ['qps', 'qlabs', 'xtec'];
 
 async function restOkEverywhere(page: import('@playwright/test').Page) {
   for (const room of ROOMS) {
-    await page.getByTestId(`area-tab-${room}`).click();
-    const rest = page.getByTestId('rest-ok');
+    const rest = page.getByTestId(`rest-ok-${room}`);
     await expect(rest).toBeVisible();
     await rest.click();
-    await expect(page.getByTestId(`area-tab-${room}`)).toContainText('15/15');
+    await expect(page.getByTestId(`weekly-count-${room}`)).toHaveText('15/15');
   }
 }
 
@@ -50,10 +49,10 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await expect(page.getByTestId('monthly-checked')).toBeChecked();
   await page.getByTestId('to-checklist').click();
 
-  for (const room of ROOMS) await expect(page.getByTestId(`area-tab-${room}`)).toBeVisible();
-  await expect(page.getByTestId('area-tab-monatlich')).toBeVisible();
-  await page.getByTestId('area-tab-qlabs').click();
-  await expect(page.getByRole('heading', { name: 'QLabs', exact: true })).toBeVisible();
+  await expect(page.getByTestId('weekly-checklist-matrix')).toBeVisible();
+  for (const room of ROOMS) await expect(page.getByRole('columnheader', { name: new RegExp(room, 'i') }).first()).toBeVisible();
+  await expect(page.getByTestId('area-tab-monthly')).toBeVisible();
+  await page.getByTestId('weekly-row-R4').locator('summary').click();
   await expect(page.getByText('VKF-Brandschutzvorschriften (BSV 2015)').first()).toBeVisible();
   await page.getByTestId('rate-R4@qlabs-mangel').click();
 
@@ -74,8 +73,11 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await expect(sheet).toHaveCount(0);
 
   await restOkEverywhere(page);
-  for (const room of ROOMS) await expect(page.getByTestId(`area-tab-${room}`)).toContainText('15/15');
-  await page.getByTestId('area-tab-monatlich').click();
+  for (const room of ROOMS) await expect(page.getByTestId(`weekly-count-${room}`)).toHaveText('15/15');
+  await page.getByTestId('weekly-checklist-matrix').evaluate((table) => table.parentElement?.scrollTo({ left: 0 }));
+  await page.evaluate(() => window.scrollTo({ top: 0 }));
+  await page.screenshot({ path: `${shots}/01-checkliste.png` });
+  await page.getByTestId('area-tab-monthly').click();
   await page.getByLabel('Bereich M1').selectOption({ label: 'QLabs' });
   await page.getByTestId('rate-M1-mangel').click();
   const monthlySheet = page.getByRole('dialog');
@@ -95,8 +97,6 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   }
   const monthlyRest = page.getByTestId('rest-ok');
   if (await monthlyRest.count()) await monthlyRest.click();
-  await page.screenshot({ path: `${shots}/01-checkliste.png` });
-
   await page.getByRole('link', { name: /3\. Mängel/ }).click();
   await expect(page.getByText(/2026-\d{2}-\d{2}-M01/).first()).toBeVisible();
   await page.getByTestId('continue-to-close').click();

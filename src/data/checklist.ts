@@ -24,11 +24,9 @@ export const SIGNATURE_TITLE = '4. Abschluss';
 
 /** Fixed room columns in form section 2.1. */
 export const FORM_AREAS = [
-  { id: 'engineering', label: 'Engineering' },
+  { id: 'qps', label: 'QPS' },
   { id: 'qlabs', label: 'QLabs' },
-  { id: 'qmeasure', label: 'QMeasure' },
-  { id: 'xtec-lager', label: 'xTec Lager' },
-  { id: 'xtec-werkstatt', label: 'xTec Werkstatt' },
+  { id: 'xtec', label: 'xTec' },
 ] as const;
 export type FormAreaId = (typeof FORM_AREAS)[number]['id'];
 
@@ -56,7 +54,7 @@ export const WEEKLY_ITEMS: ChecklistItem[] = [
   { id: 'R6', text: 'Verkehrswege frei, keine Stolperstellen oder Flüssigkeiten', basis: 'VUV Art. 19 (Verkehrswege) · Suva-Checkliste 67001 „Verkehrswege für Personen“' },
   { id: 'R7', text: 'Elektroverteilungen geschlossen und frei zugänglich', basis: 'NIV (Niederspannungs-Installationsverordnung)' },
   { id: 'R8', text: 'Kabel und Stecker intakt, keine Mehrfachstecker-Ketten', basis: 'NIV (Niederspannungs-Installationsverordnung)' },
-  { id: 'R9', text: 'PSA-Gebotszeichen vorhanden (wo PSA-Pflicht)', basis: 'VUV Art. 5 (PSA) · UVG Art. 82 (Pflicht zum Tragen) · Suva-Checkliste 67091 „Persönliche Schutzausrüstungen“' },
+  { id: 'R9', text: 'Sicherheitszeichen vorhanden, richtig und gut sichtbar (Warn-, Gebots-, Verbotszeichen)', basis: 'VUV Art. 5 (PSA) · UVG Art. 82 (Pflicht zum Tragen) · Suva-Checkliste 67091 „Persönliche Schutzausrüstungen“' },
   { id: 'R10', text: 'PSA wird getragen (wo vorgeschrieben)', basis: 'VUV Art. 5 (PSA) · UVG Art. 82 (Pflicht zum Tragen) · Suva-Checkliste 67091 „Persönliche Schutzausrüstungen“' },
   { id: 'R11', text: 'Chemikalien beschriftet, geschlossen, im Schrank', basis: 'ChemV · ArGV 3 Art. 24a' },
   { id: 'R12', text: 'Abfall getrennt, nicht überfüllt; Glasbruch im stichfesten Behälter', basis: 'VVEA / VVA (Abfälle, Sonderabfälle)' },
@@ -83,6 +81,10 @@ export const CHECKLIST_ITEM_BY_ID = new Map(ALL_ITEMS.map((item) => [item.id, it
 /** Display area names by stable id, including all register choices. */
 const AREA_LABELS: Record<string, string> = Object.fromEntries([
   ...FORM_AREAS.map(({ id, label }) => [id, label]),
+  ['engineering', 'QPS'],
+  ['qmeasure', 'QPS'],
+  ['xtec-lager', 'xTec'],
+  ['xtec-werkstatt', 'xTec'],
   ['buero', 'Büro / Verwaltung'],
   ['aussenbereich', 'Aussenbereich'],
 ]);
@@ -95,6 +97,8 @@ export function areaLabel(id: string, editableAreas: string[] = [...REGISTER_ARE
 }
 
 export function areaIdFromLabel(label: string, editableAreas: string[] = [...REGISTER_AREA_DEFAULTS]): string {
+  if (label === 'Engineering' || label === 'QMeasure') return 'qps';
+  if (label === 'xTec Lager' || label === 'xTec Werkstatt') return 'xtec';
   const fixed = Object.entries(AREA_LABELS).find(([, value]) => value === label);
   if (fixed) return fixed[0];
   if (editableAreas.includes(label)) return label;

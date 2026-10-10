@@ -7,7 +7,7 @@ Das vorhandene DOCX im Ordner `docs/sop` enthält eine ältere Formularfassung. 
 Der Rundgang wird direkt am Smartphone oder Tablet erfasst:
 
 - **Kapitel 1 Rundgangdaten**: Datum, ISO-KW, Beginn/Ende mit berechneter Dauer, Durchgeführt von, Begleitperson, Monatspunkte 2.2 und offene Mängel des letzten Rundgangs.
-- **Kapitel 2 Checkliste**: R1-R15 in fünf Räumen (75 Felder); optional M1-M9, wenn 2.2 geprüft wird. Grundlagen stehen unter jedem Punkt; „Rest OK“ beschleunigt die Prüfung.
+- **Kapitel 2 Checkliste**: R1-R15 als Matrix mit den Spalten QPS, QLabs und xTec (45 Felder); optional M1-M9, wenn 2.2 geprüft wird. „Rest OK“ steht pro Bereich zur Verfügung.
 - **Kapitel 3 Mängel und Massnahmen**: Mangel-ID JJJJ-MM-TT-Mnn, Punkt/Bereich, Beschreibung, Gefahr, Sofortmassnahme, Massnahme, Priorität, Frist und Kamerafotos.
 - **Kapitel 4 Abschluss**: vier Gesamtbewertungen sowie Unterschrift der durchführenden Person und optionale Kenntnisnahme. Formulardaten sind nach Abschluss schreibgeschützt.
 - **Register als Excel-Ersatz**: Übersicht, Rundgänge und Mängel mit vier Statuswerten. Einstellungen übernehmen Richtfristen 0/2/7/30 Tage und Höchstintervall 14 Tage aus dem Excel-Blatt „Listen“.
