@@ -147,12 +147,14 @@ function MonthlyChecklist({ walk, defects, readOnly, onRate, onEditDefect, restO
     </header>
     <ul className="divide-y divide-line">{MONTHLY_ITEMS.map((item) => {
       const selectedArea = walk.monthlyAreas[item.id] ?? '';
+      const areaOptions = settings.areas.map((value) => ({ value, label: areaLabel(value, settings.areas) })).filter((option, index, all) =>
+        all.findIndex((candidate) => candidate.label === option.label) === index || option.value === selectedArea);
       const linked = selectedArea ? defectsForCell(cellKey(item.id, selectedArea), defects) : defects.filter((defect) => defect.itemId === item.id);
       return <li key={item.id} className={`px-4 py-4 ${walk.ratings[item.id] === 'mangel' ? 'bg-danger-soft/45' : ''}`}>
         <p className="text-[15px] font-medium leading-snug"><span className="mr-1.5 font-semibold tabular-nums">{item.id}</span>{item.text}</p>
         <p className="mb-3 mt-1 text-xs leading-relaxed text-muted">{item.basis}</p>
         <label className="mb-3 block"><span className="label">Bereich</span><select className="field" value={selectedArea} disabled={readOnly} onChange={(event) => void patchMonthlyAreas(walk.id, { [item.id]: event.target.value || undefined })} aria-label={`Bereich ${item.id}`} data-testid={`monthly-area-${item.id}`}>
-          <option value="">Bereich wählen</option>{settings.areas.map((label) => <option key={label} value={label}>{label}</option>)}
+          <option value="">Bereich wählen</option>{areaOptions.map((area) => <option key={area.value} value={area.value}>{area.label}</option>)}
         </select></label>
         <RatingControl itemId={item.id} label={`${item.id} ${selectedArea ? areaLabel(selectedArea, settings.areas) : ''}`} value={walk.ratings[item.id]} disabled={readOnly || !selectedArea} onChange={(value) => onRate(item.id, selectedArea, value)} />
         {(walk.ratings[item.id] === 'mangel' || linked.length > 0) && <div className="mt-2 flex flex-wrap items-center gap-2 text-sm"><span className="text-muted">Mangel-ID</span>{linked.map((defect) => <button key={defect.id} type="button" onClick={() => onEditDefect(defect)} className="min-h-10 rounded-md border border-line-strong bg-surface px-2.5 font-medium">{defect.mangelId}</button>)}{linked.length === 0 && <span className="font-medium text-danger">Fehlt</span>}</div>}

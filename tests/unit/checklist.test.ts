@@ -8,7 +8,7 @@ describe('Checklist source from current form and Excel Grundlagen', () => {
   });
 
   it('contains exactly fifteen R points in each of three areas and nine M points', () => {
-    expect(FORM_AREAS.map((area) => area.label)).toEqual(['QPS', 'QLabs', 'xTec']);
+    expect(FORM_AREAS.map((area) => area.label)).toEqual(['QPS', 'QLabs', 'QxTec']);
     expect(WEEKLY_ITEMS.map((item) => item.id)).toEqual(Array.from({ length: 15 }, (_, i) => `R${i + 1}`));
     expect(MONTHLY_ITEMS.map((item) => item.id)).toEqual(Array.from({ length: 9 }, (_, i) => `M${i + 1}`));
     expect(WEEKLY_ITEMS.length * FORM_AREAS.length).toBe(45);

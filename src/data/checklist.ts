@@ -26,7 +26,7 @@ export const SIGNATURE_TITLE = '4. Abschluss';
 export const FORM_AREAS = [
   { id: 'qps', label: 'QPS' },
   { id: 'qlabs', label: 'QLabs' },
-  { id: 'xtec', label: 'xTec' },
+  { id: 'xtec', label: 'QxTec' },
 ] as const;
 export type FormAreaId = (typeof FORM_AREAS)[number]['id'];
 
@@ -82,9 +82,13 @@ export const CHECKLIST_ITEM_BY_ID = new Map(ALL_ITEMS.map((item) => [item.id, it
 const AREA_LABELS: Record<string, string> = Object.fromEntries([
   ...FORM_AREAS.map(({ id, label }) => [id, label]),
   ['engineering', 'QPS'],
+  ['Engineering', 'QPS'],
   ['qmeasure', 'QPS'],
-  ['xtec-lager', 'xTec'],
-  ['xtec-werkstatt', 'xTec'],
+  ['QMeasure', 'QPS'],
+  ['xtec-lager', 'QxTec'],
+  ['xtec-werkstatt', 'QxTec'],
+  ['xTec Lager', 'QxTec'],
+  ['xTec Werkstatt', 'QxTec'],
   ['buero', 'Büro / Verwaltung'],
   ['aussenbereich', 'Aussenbereich'],
 ]);

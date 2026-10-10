@@ -30,7 +30,7 @@ export const PRIORITY_KEY_TO_TEXT: Record<PriorityKey, string> = { K: 'Kritisch'
 
 /** Result options used by the walk form and register. */
 export const RESULT_LABELS: Record<ResultKey, string> = {
-  none: 'ohne Beanstandung',
+  none: 'Keine neuen Mängel festgestellt',
   minor: 'mit geringfügigen Mängeln',
   open: 'mit offenen Massnahmen',
   critical: 'kritische Mängel – Sofortmassnahmen',

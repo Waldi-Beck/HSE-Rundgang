@@ -3,9 +3,9 @@ import { autoTable, type CellHookData, type RowInput } from 'jspdf-autotable';
 import { QPS_LOGO_PNG, QPS_LOGO_RATIO } from '../assets/qpsLogo';
 import { FORM_AREAS, FORM_SUBTITLE, FORM_TITLE, INTERVAL_NOTICE, MONTHLY_ITEMS, MONTHLY_NOTICE, NOT_IN_WALK_TEXT, PRIORITY_NOTE, RATING_LABELS, RATING_LEGEND, SOP_META, WEEKLY_ITEMS, WEEKLY_NOTICE, areaLabel } from '../data/checklist';
 import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../data/register';
-import { durationMinutes, formatDate, formatDuration } from './dates';
+import { addDays, durationMinutes, formatDate, formatDuration, toISODate } from './dates';
 import { blobToDataUrl } from './image';
-import { validDefectDue } from './register';
+import { priorityDays, suggestedResult, validDefectDue } from './register';
 import type { Defect, Photo, RegisterSettings, ResultKey, Walk } from './types';
 import { cellKey } from './walk';
 
@@ -31,6 +31,31 @@ export interface PdfInput {
 
 const lastY = (doc: jsPDF): number => (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? PAGE_TOP;
 const label = (content: string) => ({ content, styles: { fontStyle: 'bold' as const, fillColor: PALE } });
+const DESCRIPTION_FALLBACK = 'Beschreibung nicht hinterlegt';
+
+export function safePdfDescription(value: unknown): string {
+  if (typeof value !== 'string') return DESCRIPTION_FALLBACK;
+  const description = value.replace(/\s+/g, ' ').trim();
+  if (!description) return DESCRIPTION_FALLBACK;
+  if (/\b(?:drek|bbxv|bbx|debug|placeholder|dummy|undefined|null|test(?:data|wert|value)?)\b/i.test(description)) return DESCRIPTION_FALLBACK;
+  if (/^[a-f0-9]{8}-[a-f0-9-]{27,}$/i.test(description)) return DESCRIPTION_FALLBACK;
+  if (/^(?:walk|defect|photo|blob|test)[-_:#][a-z0-9_-]+$/i.test(description)) return DESCRIPTION_FALLBACK;
+  return description;
+}
+
+export function pdfResultForWalk(storedResult: ResultKey | null, currentDefects: Defect[]): ResultKey {
+  if (currentDefects.length === 0) return 'none';
+  const suggested = suggestedResult(currentDefects);
+  if (suggested === 'critical' || !storedResult || storedResult === 'none') return suggested;
+  return storedResult;
+}
+
+function pdfStatus(walk: Walk, defects: Defect[]): string {
+  if (walk.status === 'closed') return 'ABGESCHLOSSEN';
+  const hasProgress = Object.keys(walk.ratings).length > 0 || !!walk.endTime || !!walk.result || !!walk.note.trim() ||
+    !!walk.signature.image || defects.length > 0;
+  return hasProgress ? 'IN BEARBEITUNG' : 'ENTWURF';
+}
 
 function vectorMark(doc: jsPDF, kind: 'ok' | 'mangel' | 'na', cx: number, cy: number, size = 2.8) {
   const half = size / 2;
@@ -62,7 +87,7 @@ function checkbox(doc: jsPDF, x: number, y: number, checked: boolean, color: [nu
   doc.setLineWidth(0.2);
 }
 
-function drawHeader(doc: jsPDF, walk: Walk, page: number, pageCount: number, fileBaseName: string) {
+function drawHeader(doc: jsPDF, walk: Walk, page: number, pageCount: number, fileBaseName: string, status: string) {
   doc.setPage(page);
   const width = doc.internal.pageSize.getWidth();
   const height = doc.internal.pageSize.getHeight();
@@ -82,6 +107,8 @@ function drawHeader(doc: jsPDF, walk: Walk, page: number, pageCount: number, fil
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.text(`Rundgang-Nr.: ${walk.docNr}`, MARGIN, y + 8.6);
+  doc.setFontSize(6.2);
+  doc.text(`Status: ${status}`, width - MARGIN - logoW - 4, y + 8.6, { align: 'right' });
   doc.setDrawColor(...LINE);
   doc.setLineWidth(0.25);
   doc.line(MARGIN, 27, width - MARGIN, 27);
@@ -89,7 +116,7 @@ function drawHeader(doc: jsPDF, walk: Walk, page: number, pageCount: number, fil
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(...MUTED);
-  doc.text(`${fileBaseName} · ${walk.status === 'closed' ? 'Abgeschlossen' : 'Entwurf'}`, MARGIN, height - 7);
+  doc.text(`${fileBaseName} · ${status}`, MARGIN, height - 7);
   doc.text(`Seite ${page} von ${pageCount}`, width - MARGIN, height - 7, { align: 'right' });
 }
 
@@ -134,10 +161,6 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   y += intro.length * 3.1 + 3;
 
   sectionTitle('1. Rundgangdaten');
-  const prevText = (walk.openDefectSnapshot ?? openFromPrevious.map(({ defect, walk: source }) => {
-    const sourceLabel = source ? `${source.docNr} ` : '';
-    return `${sourceLabel}${defect.mangelId} (${defect.itemId} / ${areaLabel(defect.area, settings.areas)}): ${defect.description} [${DEFECT_STATUS_LABELS[defect.status]}]`;
-  })).join('\n');
   autoTable(doc, {
     ...common,
     startY: y,
@@ -146,7 +169,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
       [label('Uhrzeit'), `${walk.startTime || '–'} bis ${walk.endTime || '–'}`, label('Dauer'), formatDuration(durationMinutes(walk.startTime, walk.endTime)) || '–'],
       [label('Durchgeführt von'), walk.inspector, label('Begleitperson'), walk.companion || '–'],
       [label('Monatspunkte'), '', label('Rundgang-Nr.'), walk.docNr],
-      [label('Offene Punkte letzter Rundgang'), { content: prevText || 'Keine offenen Mängel.', colSpan: 3 }],
+      [label('Neue Mängel aktuell'), `${defects.length} erfasst`, label('Frühere Massnahmen offen'), String(openFromPrevious.length)],
     ],
     columnStyles: { 0: { cellWidth: 33 }, 2: { cellWidth: 29 } },
     didDrawCell: (cell) => {
@@ -260,7 +283,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   // Page 2: defects and close block. The register may create continuation pages when needed.
   doc.addPage();
   y = PAGE_TOP;
-  sectionTitle('3. Mängel und Massnahmen');
+  sectionTitle('3. Neue Mängel und Massnahmen – aktueller Rundgang');
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(...MUTED);
@@ -270,11 +293,11 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   const photoSize = { width: 37, height: 28 };
   const defectRows: RowInput[] = defects.length ? defects.map((defect) => [
     '',
-    `${defect.description}${defect.hazard ? `\nGefahr: ${defect.hazard}` : ''}`,
+    `${safePdfDescription(defect.description)}${defect.hazard ? `\nGefahr: ${safePdfDescription(defect.hazard)}` : ''}`,
     `${defect.immediateAction ? `Sofortmassnahme: ${defect.immediateAction}\n` : ''}${defect.action || ''}`,
     `${defect.responsible || '–'}\n${PRIORITY_KEY_TO_TEXT[defect.priority]}\n${formatDate(validDefectDue(walk.date, defect, settings))}`,
     '',
-  ]) : [[{ content: 'Keine Mängel erfasst.', colSpan: 5, styles: { textColor: MUTED } }]];
+  ]) : [[{ content: 'Keine neuen Mängel festgestellt.', colSpan: 5, styles: { textColor: MUTED } }]];
   autoTable(doc, {
     ...common,
     startY: y,
@@ -344,6 +367,29 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     }
   }
 
+  sectionTitle(`Offene Massnahmen aus vorherigen Rundgängen (${openFromPrevious.length})`);
+  const previousActionRows: RowInput[] = openFromPrevious.length ? openFromPrevious.map(({ defect, walk: source }) => {
+    const sourceDate = source?.date || defect.createdAt.slice(0, 10) || walk.date;
+    const effectiveDue = validDefectDue(sourceDate, defect, settings);
+    const originalDue = defect.due || addDays(sourceDate, priorityDays(settings, defect.priority));
+    const overdue = effectiveDue < toISODate(new Date());
+    return [source?.docNr || 'nicht hinterlegt', `M${String(defect.nr).padStart(2, '0')}`, defect.itemId || '–', areaLabel(defect.area, settings.areas), safePdfDescription(defect.description), DEFECT_STATUS_LABELS[defect.status] ?? 'Status nicht hinterlegt', formatDate(originalDue), overdue ? 'ÜBERFÄLLIG' : 'fristgerecht'];
+  }) : [[{ content: 'Keine offenen Massnahmen aus vorherigen Rundgängen.', colSpan: 8, styles: { textColor: MUTED } }]];
+  autoTable(doc, {
+    ...common,
+    startY: y + 1,
+    head: [['Ursprünglicher Rundgang', 'Mangel-Nr.', 'Kontrollpunkt', 'Bereich', 'Beschreibung', 'Status', 'Ursprüngliche Frist', 'Terminstatus']],
+    body: previousActionRows,
+    rowPageBreak: 'avoid',
+    styles: { ...common.styles, fontSize: 6.4, cellPadding: 0.8, valign: 'top' },
+    headStyles: { ...common.headStyles, fontSize: 6.2 },
+    columnStyles: { 0: { cellWidth: 27 }, 1: { cellWidth: 15 }, 2: { cellWidth: 17 }, 3: { cellWidth: 20 }, 4: { cellWidth: 52 }, 5: { cellWidth: 27 }, 6: { cellWidth: 18 }, 7: { cellWidth: 18, fontStyle: 'bold' } },
+    didParseCell: (cell) => {
+      if (cell.section === 'body' && cell.column.index === 7 && cell.cell.text.some((text) => text === 'ÜBERFÄLLIG')) cell.cell.styles.textColor = RED;
+    },
+  });
+  y = lastY(doc) + 4;
+
   if (y + 55 > height - PAGE_BOTTOM) {
     doc.addPage();
     y = PAGE_TOP;
@@ -351,6 +397,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   y += 2;
   sectionTitle('4. Abschluss');
   const resultKeys = Object.keys(RESULT_LABELS) as ResultKey[];
+  const pdfResult = pdfResultForWalk(walk.result, defects);
   autoTable(doc, {
     ...common,
     startY: y,
@@ -358,7 +405,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     styles: { ...common.styles, fontSize: 7, fontStyle: 'bold', minCellHeight: 8 },
     didDrawCell: (cell) => {
       const key = resultKeys[cell.column.index];
-      if (key) checkbox(doc, cell.cell.x + 1.5, cell.cell.y + (cell.cell.height - 3) / 2, walk.result === key, GREEN);
+      if (key) checkbox(doc, cell.cell.x + 1.5, cell.cell.y + (cell.cell.height - 3) / 2, pdfResult === key, GREEN);
     },
   });
   y = lastY(doc) + 3;
@@ -388,6 +435,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
 
   // Repeat document-control header, logo, separate walk ID and page footer on every page.
   const pageCount = doc.getNumberOfPages();
-  for (let page = 1; page <= pageCount; page++) drawHeader(doc, walk, page, pageCount, fileBaseName);
+  const status = pdfStatus(walk, defects);
+  for (let page = 1; page <= pageCount; page++) drawHeader(doc, walk, page, pageCount, fileBaseName, status);
   return doc;
 }

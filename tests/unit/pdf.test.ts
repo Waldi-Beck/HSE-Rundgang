@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { jsPDF } from 'jspdf';
 import { QPS_LOGO_PNG } from '../../src/assets/qpsLogo';
 import { SOP_META } from '../../src/data/checklist';
-import { buildReportPdf } from '../../src/lib/pdf';
-import type { Walk } from '../../src/lib/types';
+import { buildReportPdf, pdfResultForWalk, safePdfDescription } from '../../src/lib/pdf';
+import type { Defect, Walk } from '../../src/lib/types';
 
 const walk: Walk = {
   id: 'pdf-walk',
@@ -30,6 +30,16 @@ const walk: Walk = {
   closedAt: null,
 };
 
+function makeDefect(patch: Partial<Defect> = {}): Defect {
+  return {
+    id: 'pdf-defect', walkId: 'pdf-walk', nr: 1, mangelId: '2026-10-06-M01', itemId: 'R1', area: 'qps',
+    description: 'Fluchtweg durch Material blockiert', hazard: 'Flucht im Notfall erschwert', immediateAction: 'Material entfernt',
+    action: 'Bodenbereich markieren', responsible: 'Max Muster', priority: 'H', due: '2026-10-09', status: 'open',
+    doneAt: null, recheckAt: null, controlledBy: '', fixed: null, newDue: '', note: '',
+    createdAt: '2026-10-06T09:00:00.000Z', updatedAt: '2026-10-06T09:00:00.000Z', ...patch,
+  };
+}
+
 describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
   it('druckt die neue 2.1-Matrix mit den drei Bereichen und Textbewertungen', async () => {
     const pdf = await buildReportPdf({
@@ -38,7 +48,41 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
       settings: { id: 'app', areas: ['Engineering', 'QLabs'], priorityDays: { K: 0, H: 2, M: 7, N: 30 }, maxIntervalDays: 14 },
     });
     const output = pdf.output();
-    for (const text of ['QPS', 'QLabs', 'xTec', 'OK', 'Mangel', 'n.a.']) expect(output).toContain(text);
+    for (const text of ['QPS', 'QLabs', 'QxTec', 'OK', 'Mangel', 'n.a.']) expect(output).toContain(text);
+  });
+
+  it('separates old open measures from current-round defects and uses current-only outcome', async () => {
+    const previousWalk = { ...walk, id: 'previous-walk', docNr: 'HSE-RG-2026-019', date: '2026-10-01', status: 'closed' as const };
+    const previousDefect = makeDefect({ walkId: previousWalk.id, nr: 1, mangelId: '2026-10-01-M01', area: 'xtec-werkstatt', description: 'Fluchtweg durch Material blockiert', due: '2026-10-03' });
+    const currentWalk = { ...walk, docNr: 'HSE-RG-2026-020', status: 'closed' as const, result: 'open' as const, closedAt: '2026-10-10T10:00:00.000Z' };
+    const pdf = await buildReportPdf({
+      walk: currentWalk, defects: [], photos: [], openFromPrevious: [{ defect: previousDefect, walk: previousWalk }],
+      fileBaseName: 'previous-actions-test',
+      settings: { id: 'app', areas: ['Engineering', 'QLabs', 'xTec Lager', 'xTec Werkstatt'], priorityDays: { K: 0, H: 2, M: 7, N: 30 }, maxIntervalDays: 14 },
+    });
+    const output = pdf.output();
+    for (const text of ['Keine neuen Mängel festgestellt.', 'Offene Massnahmen aus vorherigen', '(1)', 'HSE-RG-2026-019', 'M01', 'R1', 'QxTec', 'Fluchtweg durch Material blockiert', 'Status: ABGESCHLOSSEN']) expect(output).toContain(text);
+    expect(pdfResultForWalk('open', [])).toBe('none');
+    expect(pdfResultForWalk('none', [makeDefect({ priority: 'M' })])).toBe('minor');
+    expect(pdfResultForWalk('none', [makeDefect({ priority: 'K' })])).toBe('critical');
+  });
+
+  it('replaces internal placeholders and empty defect descriptions with safe text', async () => {
+    expect(safePdfDescription('drek')).toBe('Beschreibung nicht hinterlegt');
+    expect(safePdfDescription('bbxv')).toBe('Beschreibung nicht hinterlegt');
+    expect(safePdfDescription('')).toBe('Beschreibung nicht hinterlegt');
+    const previousDefect = makeDefect({ walkId: 'previous', description: 'bbxv' });
+    const pdf = await buildReportPdf({
+      walk: { ...walk, ratings: { 'R1@xtec': 'mangel' } },
+      defects: [makeDefect({ description: 'drek', area: 'xtec' })],
+      photos: [], openFromPrevious: [{ defect: previousDefect, walk: { ...walk, id: 'previous', docNr: 'HSE-RG-2026-019', date: '2026-10-01' } }],
+      fileBaseName: 'placeholder-safety-test',
+      settings: { id: 'app', areas: ['Engineering', 'QLabs', 'xTec Lager'], priorityDays: { K: 0, H: 2, M: 7, N: 30 }, maxIntervalDays: 14 },
+    });
+    const output = pdf.output();
+    expect(output).not.toContain('drek');
+    expect(output).not.toContain('bbxv');
+    expect(output.match(/Beschreibung nicht hinterlegt/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
   it('druckt QPS-Logo und unveränderte SOP-Dokumenten-ID auf mindestens drei Seiten', async () => {
@@ -70,7 +114,7 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
         updatedAt: '',
       }));
       const pdf = await buildReportPdf({
-        walk,
+        walk: { ...walk, status: 'closed', closedAt: '2026-10-06T10:00:00.000Z' },
         defects,
         photos: [],
         openFromPrevious: [],
@@ -90,6 +134,7 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
         `Version: ${SOP_META.version}`,
         'Gültig ab: 05.10.2026',
         `Rundgang-Nr.: ${walk.docNr}`,
+        'Status: ABGESCHLOSSEN',
       ]) {
         expect(pageStreams.every((stream) => stream.includes(headerText)), `missing on a page: ${headerText}`).toBe(true);
       }

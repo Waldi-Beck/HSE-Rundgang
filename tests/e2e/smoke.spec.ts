@@ -92,7 +92,7 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   for (let index = 1; index <= 9; index++) {
     const monthlyArea = page.getByTestId(`monthly-area-M${index}`);
     const area = index === 1 ? 'QLabs' : 'Engineering';
-    await monthlyArea.selectOption({ label: area });
+    await monthlyArea.selectOption({ value: area });
     await expect(monthlyArea).toHaveValue(area);
   }
   const monthlyRest = page.getByTestId('rest-ok');
@@ -136,5 +136,24 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   const secondDocNr = (await page.getByTestId('walk-docnr').textContent())?.trim();
   expect(secondDocNr).toMatch(/^HSE-RG-\d{4}-002$/);
   await expect(page.getByTestId('open-points')).toContainText('Feuerlöscher hinter Material abgestellt');
+  await expect(page.getByTestId('monthly-checked')).not.toBeChecked();
+  const secondEndTime = await page.getByLabel('Uhrzeit Beginn').evaluate((element: HTMLInputElement) => {
+    const [hour, minute] = element.value.split(':').map(Number);
+    const end = (hour * 60 + minute + 30) % 1440;
+    return `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`;
+  });
+  await page.getByLabel('Uhrzeit Ende').fill(secondEndTime);
+  await page.getByTestId('to-checklist').click();
+  await restOkEverywhere(page);
+  await page.getByTestId('continue-to-close').click();
+  await page.getByRole('radio', { name: 'Keine neuen Mängel festgestellt' }).click();
+  await sign(page);
+  await page.getByTestId('close-walk').click();
+  await expect(page.getByText(/Abgeschlossen am/)).toBeVisible();
+  const [secondPdf] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-pdf').click()]);
+  const secondPdfPath = test.info().outputPath(secondPdf.suggestedFilename());
+  await secondPdf.saveAs(secondPdfPath);
+  expect(readFileSync(secondPdfPath).subarray(0, 5).toString()).toBe('%PDF-');
+  expect(statSync(secondPdfPath).size).toBeGreaterThan(30_000);
   expect(errors).toEqual([]);
 });

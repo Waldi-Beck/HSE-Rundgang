@@ -17,7 +17,7 @@ export async function exportWalkPdf(walkId: string): Promise<string> {
   const defects = (await db.defects.where('walkId').equals(walkId).toArray()).sort((a, b) => a.nr - b.nr);
   const photos = await db.photos.where('defectId').anyOf(defects.map((defect) => defect.id)).toArray();
   photos.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const openFromPrevious = walk.openDefectSnapshot ? [] : await openDefectsBefore(walk);
+  const openFromPrevious = await openDefectsBefore(walk);
   const fileBaseName = await reportFileBase(walk);
   const { buildReportPdf } = await import('./lib/pdf');
   const [settings] = await Promise.all([db.settings.get('app')]);

@@ -91,7 +91,7 @@ describe('Workbook deadline and inspection calculations', () => {
     expect(metrics.defectsByArea.map(({ area, total, open, done }) => ({ area, total, open, done }))).toEqual([
       { area: 'QPS', total: 2, open: 1, done: 1 },
       { area: 'QLabs', total: 1, open: 1, done: 0 },
-      { area: 'xTec', total: 1, open: 1, done: 0 },
+      { area: 'QxTec', total: 1, open: 1, done: 0 },
     ]);
   });
 });

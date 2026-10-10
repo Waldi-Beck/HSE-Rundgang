@@ -32,7 +32,7 @@ function dashboardArea(area: string, settings: RegisterSettings): string {
   const normalized = area.trim().toLocaleLowerCase();
   if (['qps', 'engineering', 'qmeasure'].includes(normalized)) return 'QPS';
   if (normalized === 'qlabs') return 'QLabs';
-  if (['xtec', 'xtec lager', 'xtec werkstatt', 'xtec-lager', 'xtec-werkstatt'].includes(normalized)) return 'xTec';
+  if (['xtec', 'qxtec', 'xtec lager', 'xtec werkstatt', 'xtec-lager', 'xtec-werkstatt'].includes(normalized)) return 'QxTec';
   return areaLabel(area, settings.areas);
 }
 

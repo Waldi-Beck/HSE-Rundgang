@@ -1,7 +1,7 @@
 import { Trash, X } from '@phosphor-icons/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
-import { FORM_AREAS, MONTHLY_ITEMS, WEEKLY_ITEMS } from '../data/checklist';
+import { FORM_AREAS, MONTHLY_ITEMS, WEEKLY_ITEMS, areaLabel } from '../data/checklist';
 import { PRIORITIES, PRIORITY_KEY_TO_TEXT } from '../data/register';
 import { db, deleteDefect, saveDefect } from '../db';
 import { addDays } from '../lib/dates';
@@ -28,7 +28,9 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
   ];
   const items = walk.monthlyChecked ? [...WEEKLY_ITEMS, ...MONTHLY_ITEMS] : WEEKLY_ITEMS;
   const weekly = d.itemId ? isWeeklyItem(d.itemId) : true;
-  const areaOptions = weekly ? FORM_AREAS.map((area) => ({ id: area.id, label: area.label })) : settings.areas.map((area) => ({ id: area, label: area }));
+  const monthlyAreaOptions = settings.areas.map((id) => ({ id, label: areaLabel(id, settings.areas) })).filter((area, index, all) =>
+    all.findIndex((candidate) => candidate.label === area.label) === index || area.id === d.area);
+  const areaOptions = weekly ? FORM_AREAS.map((area) => ({ id: area.id, label: area.label })) : monthlyAreaOptions;
   const missing = defectMissingFields(d);
 
   useEffect(() => {
@@ -72,7 +74,7 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <div>
             <h2 id="defect-title" className="text-lg font-semibold">Mangel {d.mangelId}</h2>
-            <p className="text-sm text-muted">Nr. {d.nr} · {d.itemId || 'Kontrollpunkt wählen'}{d.area ? ` · ${d.area}` : ''}</p>
+            <p className="text-sm text-muted">Nr. {d.nr} · {d.itemId || 'Kontrollpunkt wählen'}{d.area ? ` · ${areaLabel(d.area, settings.areas)}` : ''}</p>
           </div>
           <button type="button" onClick={() => onClose(false)} aria-label="Schliessen" className="grid h-11 w-11 place-items-center rounded-lg"><X size={22} aria-hidden /></button>
         </div>

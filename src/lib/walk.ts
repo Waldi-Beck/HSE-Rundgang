@@ -78,7 +78,7 @@ export function cellLabel(key: string): string {
 
 export function defectPointLabel(defect: Pick<Defect, 'itemId' | 'area'>): string {
   const formArea = FORM_AREAS.find((candidate) => candidate.id === defect.area);
-  return defect.area ? `${defect.itemId} / ${formArea?.label ?? defect.area}` : defect.itemId;
+  return defect.area ? `${defect.itemId} / ${formArea?.label ?? areaLabel(defect.area)}` : defect.itemId;
 }
 
 export function nextDefectNr(defects: Pick<Defect, 'nr'>[]): number {
