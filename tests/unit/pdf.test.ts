@@ -83,7 +83,7 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
       expect(SOP_META.docId).toBe('QPS_HSE_00064');
       expect(SOP_META.version).toBe('1.0');
       expect(SOP_META.validFrom).toBe('2026-10-05');
-      const output = pdf.output();
+      const pageStreams = (pdf as unknown as { internal: { pages: string[][] } }).internal.pages.slice(1).map((commands) => commands.join('\n'));
       for (const headerText of [
         `Dokumenten ID: ${SOP_META.docId}`,
         `Dokumententitel: ${SOP_META.title}`,
@@ -91,7 +91,7 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
         'Gültig ab: 05.10.2026',
         `Rundgang-Nr.: ${walk.docNr}`,
       ]) {
-        expect(output.match(new RegExp(headerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(pageCount);
+        expect(pageStreams.every((stream) => stream.includes(headerText)), `missing on a page: ${headerText}`).toBe(true);
       }
     } finally {
       addImage.mockRestore();

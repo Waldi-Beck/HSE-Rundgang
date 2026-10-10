@@ -63,6 +63,7 @@ function checkbox(doc: jsPDF, x: number, y: number, checked: boolean, color: [nu
 }
 
 function drawHeader(doc: jsPDF, walk: Walk, page: number, pageCount: number, fileBaseName: string) {
+  doc.setPage(page);
   const width = doc.internal.pageSize.getWidth();
   const height = doc.internal.pageSize.getHeight();
   const logoW = 26;
