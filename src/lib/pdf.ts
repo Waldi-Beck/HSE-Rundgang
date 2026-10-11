@@ -33,6 +33,11 @@ const lastY = (doc: jsPDF): number => (doc as unknown as { lastAutoTable?: { fin
 const label = (content: string) => ({ content, styles: { fontStyle: 'bold' as const, fillColor: PALE } });
 const DESCRIPTION_FALLBACK = 'Beschreibung nicht hinterlegt';
 
+export function pdfWalkNumber(walk: Pick<Walk, 'date'>): string {
+  // Presentation-only number requested for the PDF; stored docNr remains the immutable app key.
+  return `HSE-RG_${walk.date.slice(0, 10).replaceAll('-', '_')}`;
+}
+
 export function safePdfDescription(value: unknown): string {
   if (typeof value !== 'string') return DESCRIPTION_FALLBACK;
   const description = value.replace(/\s+/g, ' ').trim();
@@ -106,7 +111,7 @@ function drawHeader(doc: jsPDF, walk: Walk, page: number, pageCount: number, fil
   doc.addImage(QPS_LOGO_PNG, 'PNG', width - MARGIN - logoW, 5, logoW, logoH);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text(`Rundgang-Nr.: ${walk.docNr}`, MARGIN, y + 8.6);
+  doc.text(`Rundgang-Nr.: ${pdfWalkNumber(walk)}`, MARGIN, y + 8.6);
   doc.setFontSize(6.2);
   doc.text(`Status: ${status}`, width - MARGIN - logoW - 4, y + 8.6, { align: 'right' });
   doc.setDrawColor(...LINE);

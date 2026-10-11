@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { jsPDF } from 'jspdf';
 import { QPS_LOGO_PNG } from '../../src/assets/qpsLogo';
 import { SOP_META } from '../../src/data/checklist';
-import { buildReportPdf, pdfResultForWalk, safePdfDescription } from '../../src/lib/pdf';
+import { buildReportPdf, pdfResultForWalk, pdfWalkNumber, safePdfDescription } from '../../src/lib/pdf';
 import type { Defect, Walk } from '../../src/lib/types';
 
 const walk: Walk = {
@@ -41,6 +41,9 @@ function makeDefect(patch: Partial<Defect> = {}): Defect {
 }
 
 describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
+  it('formatiert die Rundgang-Nr. im PDF aus dem Datum mit Unterstrichen', () => {
+    expect(pdfWalkNumber(walk)).toBe('HSE-RG_2026_10_06');
+  });
   it('druckt die neue 2.1-Matrix mit den drei Bereichen und Textbewertungen', async () => {
     const pdf = await buildReportPdf({
       walk: { ...walk, ratings: { 'R1@qps': 'ok', 'R1@qlabs': 'mangel', 'R1@xtec': 'na' } },
@@ -134,7 +137,7 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
         `Dokumententitel: ${SOP_META.title}`,
         `Version: ${SOP_META.version}`,
         'Gültig ab: 05.10.2026',
-        `Rundgang-Nr.: ${walk.docNr}`,
+        'Rundgang-Nr.: HSE-RG_2026_10_06',
         'Status: ABGESCHLOSSEN',
       ]) {
         expect(pageStreams.every((stream) => stream.includes(headerText)), `missing on a page: ${headerText}`).toBe(true);
