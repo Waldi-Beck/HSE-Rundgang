@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useState } from 'react';
 import { Link, NavLink, Navigate, useParams } from 'react-router';
 import { db, newDefectDraft } from '../db';
-import { weekLabel } from '../lib/dates';
+import { displayWalkNumber, weekLabel } from '../lib/dates';
 import type { Defect } from '../lib/types';
 import { countRatings } from '../lib/walk';
 import { DefectSheet } from '../components/DefectSheet';
@@ -59,7 +59,7 @@ export function WalkPage() {
             <p className="truncate text-sm text-muted">
               {c.checked}/{c.total} Felder bewertet
             </p>
-            <p className="truncate text-xs font-medium text-muted" data-testid="walk-docnr">{walk.docNr}</p>
+            <p className="truncate text-xs font-medium text-muted" data-testid="walk-docnr">{displayWalkNumber(walk.date)}</p>
           </div>
           {closed ? (
             <Badge tone="ok">

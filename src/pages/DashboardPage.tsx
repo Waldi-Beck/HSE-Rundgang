@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { createWalk, db } from '../db';
-import { formatDate, weekLabel } from '../lib/dates';
+import { displayWalkNumber, formatDate, weekLabel } from '../lib/dates';
 import { overviewMetrics, roundRegisterRows } from '../lib/register';
 import { Badge, EmptyState } from '../components/ui';
 import { useRegisterSettings } from '../components/SettingsContext';
@@ -117,7 +117,7 @@ export function DashboardPage() {
                     <Link to={`/rundgang/${walk.id}/daten`} className="flex items-center gap-3 px-4 py-3 active:bg-surface-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">{walk.docNr}</span>
+                          <span className="font-semibold">{displayWalkNumber(walk.date)}</span>
                           <span className="text-sm text-muted">{weekLabel(walk.isoYear, walk.week)}</span>
                           {walk.status === 'closed' ? <Badge tone="ok">abgeschlossen</Badge> : <Badge tone="warn">Entwurf</Badge>}
                           {monthlyWarning && <Badge tone="warn">2.2 fehlt</Badge>}

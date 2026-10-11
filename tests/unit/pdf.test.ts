@@ -65,7 +65,7 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
       settings: { id: 'app', areas: ['Engineering', 'QLabs', 'xTec Lager', 'xTec Werkstatt'], priorityDays: { K: 0, H: 2, M: 7, N: 30 }, maxIntervalDays: 14 },
     });
     const output = pdf.output();
-    for (const text of ['Keine neuen Mängel festgestellt.', 'Offene Massnahmen aus vorherigen', '(1)', 'HSE-RG-2026-019', 'M01', 'R1', 'QxTec', 'Fluchtweg durch Material blockiert', 'Status: ABGESCHLOSSEN']) expect(output).toContain(text);
+    for (const text of ['Keine neuen Mängel festgestellt.', 'Offene Massnahmen aus vorherigen', '(1)', 'HSE-RG_2026_10_01', 'M01', 'R1', 'QxTec', 'Fluchtweg durch Material blockiert', 'Status: ABGESCHLOSSEN']) expect(output).toContain(text);
     expect(pdfResultForWalk('open', [])).toBe('none');
     expect(pdfResultForWalk('none', [makeDefect({ priority: 'M' })])).toBe('minor');
     expect(pdfResultForWalk('none', [makeDefect({ priority: 'K' })])).toBe('critical');

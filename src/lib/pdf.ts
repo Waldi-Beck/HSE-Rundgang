@@ -3,7 +3,7 @@ import { autoTable, type CellHookData, type RowInput } from 'jspdf-autotable';
 import { QPS_LOGO_PNG, QPS_LOGO_RATIO } from '../assets/qpsLogo';
 import { FORM_AREAS, FORM_TITLE, INTERVAL_NOTICE, MONTHLY_ITEMS, MONTHLY_NOTICE, NOT_IN_WALK_TEXT, PRIORITY_NOTE, RATING_LABELS, RATING_LEGEND, SOP_META, WEEKLY_ITEMS, WEEKLY_NOTICE, areaLabel } from '../data/checklist';
 import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../data/register';
-import { addDays, durationMinutes, formatDate, formatDuration, toISODate } from './dates';
+import { addDays, displayWalkNumber, durationMinutes, formatDate, formatDuration, toISODate } from './dates';
 import { blobToDataUrl } from './image';
 import { priorityDays, suggestedResult, validDefectDue } from './register';
 import type { Defect, Photo, RegisterSettings, ResultKey, Walk } from './types';
@@ -35,7 +35,7 @@ const DESCRIPTION_FALLBACK = 'Beschreibung nicht hinterlegt';
 
 export function pdfWalkNumber(walk: Pick<Walk, 'date'>): string {
   // Presentation-only number requested for the PDF; stored docNr remains the immutable app key.
-  return `HSE-RG_${walk.date.slice(0, 10).replaceAll('-', '_')}`;
+  return displayWalkNumber(walk.date);
 }
 
 export function safePdfDescription(value: unknown): string {
@@ -169,7 +169,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
       [label('Datum'), formatDate(walk.date), label('Kalenderwoche'), `${walk.isoYear}-KW${String(walk.week).padStart(2, '0')}`],
       [label('Uhrzeit'), `${walk.startTime || '–'} bis ${walk.endTime || '–'}`, label('Dauer'), formatDuration(durationMinutes(walk.startTime, walk.endTime)) || '–'],
       [label('Durchgeführt von'), walk.inspector, label('Begleitperson'), walk.companion || '–'],
-      [label('Monatspunkte'), '', label('Rundgang-Nr.'), walk.docNr],
+      [label('Monatspunkte'), '', label('Rundgang-Nr.'), displayWalkNumber(walk.date)],
       [label('Neue Mängel aktuell'), `${defects.length} erfasst`, label('Frühere Massnahmen offen'), String(openFromPrevious.length)],
     ],
     columnStyles: { 0: { cellWidth: 33 }, 2: { cellWidth: 29 } },
@@ -374,7 +374,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     const effectiveDue = validDefectDue(sourceDate, defect, settings);
     const originalDue = defect.due || addDays(sourceDate, priorityDays(settings, defect.priority));
     const overdue = effectiveDue < toISODate(new Date());
-    return [source?.docNr || 'nicht hinterlegt', `M${String(defect.nr).padStart(2, '0')}`, defect.itemId || '–', areaLabel(defect.area, settings.areas), safePdfDescription(defect.description), DEFECT_STATUS_LABELS[defect.status] ?? 'Status nicht hinterlegt', formatDate(originalDue), overdue ? 'ÜBERFÄLLIG' : 'fristgerecht'];
+    return [source ? displayWalkNumber(source.date) : 'nicht hinterlegt', `M${String(defect.nr).padStart(2, '0')}`, defect.itemId || '–', areaLabel(defect.area, settings.areas), safePdfDescription(defect.description), DEFECT_STATUS_LABELS[defect.status] ?? 'Status nicht hinterlegt', formatDate(originalDue), overdue ? 'ÜBERFÄLLIG' : 'fristgerecht'];
   }) : [[{ content: 'Keine offenen Massnahmen aus vorherigen Rundgängen.', colSpan: 8, styles: { textColor: MUTED } }]];
   autoTable(doc, {
     ...common,

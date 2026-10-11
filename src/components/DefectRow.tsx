@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { areaLabel } from '../data/checklist';
 import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT } from '../data/register';
 import { updateDefect } from '../db';
-import { formatDate } from '../lib/dates';
+import { displayWalkNumber, formatDate } from '../lib/dates';
 import { defectDaysOpen, validDefectDue } from '../lib/register';
 import type { Defect, DefectStatus, Walk } from '../lib/types';
 import { useRegisterSettings } from './SettingsContext';
@@ -53,7 +53,7 @@ export function DefectRow({
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
         <span className="font-semibold tabular-nums">{defect.mangelId}</span>
         <span className="text-muted">Nr. {defect.nr} · {defect.itemId}</span>
-        {showOrigin && walk && <span className="text-muted">{walk.docNr}</span>}
+        {showOrigin && walk && <span className="text-muted">{displayWalkNumber(walk.date)}</span>}
         <span className="ml-auto flex items-center gap-1.5">
           <Badge tone={defect.priority === 'K' ? 'danger' : 'neutral'}>{PRIORITY_KEY_TO_TEXT[defect.priority]}</Badge>
           <Badge tone={defect.status === 'done' ? 'ok' : overdue ? 'danger' : defect.status === 'recheck' ? 'warn' : 'neutral'}>{DEFECT_STATUS_LABELS[defect.status]}</Badge>

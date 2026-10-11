@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import { areaLabel } from '../data/checklist';
 import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../data/register';
-import { isoWeek } from './dates';
+import { displayWalkNumber, isoWeek } from './dates';
 import { defectDaysOpen, roundRegisterRows, validDefectDue } from './register';
 import type { Defect, RegisterSettings, Walk } from './types';
 
@@ -82,7 +82,7 @@ export async function buildRegisterWorkbook(input: RegisterWorkbookInput): Promi
       walk.result ? RESULT_LABELS[walk.result] : '',
       item.pdfFilename,
       walk.note,
-      walk.docNr,
+      displayWalkNumber(walk.date),
     ]);
     styleDataRow(row);
     row.getCell(2).numFmt = 'dd.mm.yyyy';
@@ -128,7 +128,7 @@ export async function buildRegisterWorkbook(input: RegisterWorkbookInput): Promi
       defectDaysOpen(walkDate, defect),
       overdue ? 'ÜBERFÄLLIG' : '',
       defect.note,
-      walk?.docNr ?? '',
+      walk ? displayWalkNumber(walk.date) : '',
     ]);
     styleDataRow(row);
     for (const column of [2, 13, 15, 16, 19, 20]) row.getCell(column).numFmt = 'dd.mm.yyyy';

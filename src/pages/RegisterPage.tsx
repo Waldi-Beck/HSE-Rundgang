@@ -6,7 +6,7 @@ import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../da
 import { areaLabel } from '../data/checklist';
 import { db, updateDefect } from '../db';
 import { exportRegisterXlsx } from '../export';
-import { formatDate, toISODate } from '../lib/dates';
+import { displayWalkNumber, formatDate, toISODate } from '../lib/dates';
 import { defectDaysOpen, roundRegisterRows, validDefectDue } from '../lib/register';
 import type { Defect, DefectStatus, Walk } from '../lib/types';
 import { EmptyState, useToast } from '../components/ui';
@@ -64,7 +64,7 @@ function RoundsRegister({ rows }: { rows: ReturnType<typeof roundRegisterRows> }
       <td className={`px-3 py-3 ${row.monthlyWarning ? 'font-semibold text-warn' : ''}`}>{row.walk.monthlyChecked ? 'Ja' : 'Nein'}{row.monthlyWarning ? ' · 2.2 fehlt' : ''}</td>
       <td className="px-3 py-3">{row.walk.startTime}</td><td className="px-3 py-3">{row.walk.endTime || '–'}</td><td className="px-3 py-3">{row.durationMinutes === null ? '–' : `${Math.floor(row.durationMinutes / 60)}:${String(row.durationMinutes % 60).padStart(2, '0')}`}</td>
       <td className="px-3 py-3">{row.walk.inspector}</td><td className="px-3 py-3">{row.walk.companion || '–'}</td><td className="px-3 py-3">{row.defectCount}</td><td className="px-3 py-3">{row.criticalCount}</td><td className="px-3 py-3">{row.openCount}</td>
-      <td className="px-3 py-3">{row.walk.result ? RESULT_LABELS[row.walk.result] : '–'}</td><td className="px-3 py-3"><Link className="text-accent underline" to={`/rundgang/${row.walk.id}/abschluss`}>{row.pdfFilename}</Link></td><td className="max-w-48 truncate px-3 py-3">{row.walk.note}</td><td className="px-3 py-3 font-medium">{row.walk.docNr}</td>
+      <td className="px-3 py-3">{row.walk.result ? RESULT_LABELS[row.walk.result] : '–'}</td><td className="px-3 py-3"><Link className="text-accent underline" to={`/rundgang/${row.walk.id}/abschluss`}>{row.pdfFilename}</Link></td><td className="max-w-48 truncate px-3 py-3">{row.walk.note}</td><td className="px-3 py-3 font-medium">{displayWalkNumber(row.walk.date)}</td>
     </tr>)}
   </tbody></table></div>;
 }

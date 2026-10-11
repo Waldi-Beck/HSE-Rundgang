@@ -37,7 +37,7 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
 
   await page.getByTestId('new-walk').click();
   const docNr = (await page.getByTestId('walk-docnr').textContent())?.trim();
-  expect(docNr).toMatch(/^HSE-RG-\d{4}-001$/);
+  expect(docNr).toMatch(/^HSE-RG_\d{4}_\d{2}_\d{2}$/);
   await page.getByLabel('Durchgeführt von').fill('Max Muster');
   const endTime = await page.getByLabel('Uhrzeit Beginn').evaluate((element: HTMLInputElement) => {
     const [hour, minute] = element.value.split(':').map(Number);
@@ -110,7 +110,7 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await page.screenshot({ path: `${shots}/03-abschluss.png` });
 
   const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-pdf').click()]);
-  expect(pdf.suggestedFilename()).toBe(`HSE-RG_${new Date().toISOString().slice(0, 10).replaceAll('-', '_')}.pdf`);
+  expect(pdf.suggestedFilename()).toBe(`${docNr}.pdf`);
   const pdfPath = test.info().outputPath(pdf.suggestedFilename());
   if (process.env.KEEP_PDF) await pdf.saveAs(process.env.KEEP_PDF);
   await pdf.saveAs(pdfPath);
@@ -134,7 +134,7 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await expect(page.getByTestId('overview-round-count')).toHaveText('1');
   await page.getByTestId('new-walk').click();
   const secondDocNr = (await page.getByTestId('walk-docnr').textContent())?.trim();
-  expect(secondDocNr).toMatch(/^HSE-RG-\d{4}-002$/);
+  expect(secondDocNr).toMatch(/^HSE-RG_\d{4}_\d{2}_\d{2}$/);
   await expect(page.getByTestId('open-points')).toContainText('Feuerlöscher hinter Material abgestellt');
   await expect(page.getByTestId('monthly-checked')).not.toBeChecked();
   const secondEndTime = await page.getByLabel('Uhrzeit Beginn').evaluate((element: HTMLInputElement) => {

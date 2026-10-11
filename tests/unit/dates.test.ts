@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, addMonths, createMangelId, durationMinutes, formatDate, formatDuration, formatWalkNumber, isoWeek, parseWalkNumber, reportBaseName } from '../../src/lib/dates';
+import { addDays, addMonths, createMangelId, displayWalkNumber, durationMinutes, formatDate, formatDuration, formatWalkNumber, isoWeek, parseWalkNumber, reportBaseName } from '../../src/lib/dates';
 
 describe('ISO week', () => {
   it.each([
@@ -29,6 +29,7 @@ describe('Register date IDs and report filenames', () => {
   });
   it('uses round date and immutable document number in the PDF name', () => {
     expect(reportBaseName('2026-10-08', 'HSE-RG-2026-001')).toBe('HSE-RG_2026_10_08');
+    expect(displayWalkNumber('2026-10-11')).toBe('HSE-RG_2026_10_11');
   });
 });
 

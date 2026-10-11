@@ -89,6 +89,11 @@ export function reportBaseName(date: string, _docNr: string): string {
   return `HSE-RG_${date.slice(0, 10).replaceAll('-', '_')}`;
 }
 
+/** User-facing walk identifier used in lists and reports; database docNr stays immutable. */
+export function displayWalkNumber(date: string): string {
+  return reportBaseName(date, '');
+}
+
 export function isOverdue(due: string | null | undefined, today = toISODate(new Date())): boolean {
   return !!due && due < today;
 }

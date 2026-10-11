@@ -25,6 +25,7 @@ describe('Excel register export', () => {
     expect(header('Mängel')).toEqual([
       'Mangel-ID', 'Datum', 'KW', 'Nr. im Formular', 'Bereich', 'Kontrollpunkt', 'Beschreibung des Mangels', 'Festgestellte Gefahr', 'Priorität', 'Sofortmassnahme', 'Massnahme', 'Verantwortlich', 'Frist', 'Status', 'Erledigt am', 'Nachkontrolle am', 'Kontrolliert von', 'Mangel behoben?', 'Neuer Termin (bei Nein)', 'Gültige Frist', 'Tage offen', 'Überfällig', 'Bemerkung', 'Rundgang-Nr.',
     ]);
-    expect(workbook.getWorksheet('Rundgänge')?.getRow(2).getCell(18).value).toBe('HSE-RG-2026-001');
+    expect(workbook.getWorksheet('Rundgänge')?.getRow(2).getCell(18).value).toBe('HSE-RG_2026_10_08');
+    expect(workbook.getWorksheet('Rundgänge')?.getRow(2).getCell(16).value).toBe('HSE-RG_2026_10_08.pdf');
   });
 });
