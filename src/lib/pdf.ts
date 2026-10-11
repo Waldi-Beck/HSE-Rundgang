@@ -150,10 +150,11 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   doc.setFontSize(17);
   doc.setTextColor(...INK);
   doc.text(FORM_TITLE, MARGIN, y + 6);
+  const titleWidth = doc.getTextWidth(FORM_TITLE);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...MUTED);
-  doc.text(FORM_SUBTITLE, MARGIN + doc.getTextWidth(FORM_TITLE) + 2, y + 6);
+  doc.text(FORM_SUBTITLE, MARGIN + titleWidth + 2, y + 6);
   y += 9;
   doc.setFontSize(6.8);
   const intro = doc.splitTextToSize(`${INTERVAL_NOTICE} ${NOT_IN_WALK_TEXT}`, contentWidth);
