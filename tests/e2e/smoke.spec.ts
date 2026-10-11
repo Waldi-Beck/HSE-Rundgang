@@ -110,7 +110,7 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await page.screenshot({ path: `${shots}/03-abschluss.png` });
 
   const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-pdf').click()]);
-  expect(pdf.suggestedFilename()).toBe(`HSE-Rundgang_${new Date().toISOString().slice(0, 10)}_${docNr}.pdf`);
+  expect(pdf.suggestedFilename()).toBe(`HSE-RG_${new Date().toISOString().slice(0, 10).replaceAll('-', '_')}.pdf`);
   const pdfPath = test.info().outputPath(pdf.suggestedFilename());
   if (process.env.KEEP_PDF) await pdf.saveAs(process.env.KEEP_PDF);
   await pdf.saveAs(pdfPath);

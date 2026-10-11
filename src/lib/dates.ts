@@ -85,8 +85,8 @@ export function createMangelId(date: string, formNumber: number): string {
   return `${date.slice(0, 10)}-M${String(formNumber).padStart(2, '0')}`;
 }
 
-export function reportBaseName(date: string, docNr: string): string {
-  return `HSE-Rundgang_${date.slice(0, 10)}_${docNr}`;
+export function reportBaseName(date: string, _docNr: string): string {
+  return `HSE-RG_${date.slice(0, 10).replaceAll('-', '_')}`;
 }
 
 export function isOverdue(due: string | null | undefined, today = toISODate(new Date())): boolean {

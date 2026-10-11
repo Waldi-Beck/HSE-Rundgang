@@ -77,7 +77,7 @@ describe('Workbook deadline and inspection calculations', () => {
     expect(suggestedResult([makeDefect({ priority: 'K' })])).toBe('critical');
     expect(defectDaysOpen('2026-10-01', makeDefect(), '2026-10-08')).toBe(7);
     const rows = roundRegisterRows([makeWalk()], [makeDefect()], DEFAULT_REGISTER_SETTINGS);
-    expect(rows[0]).toMatchObject({ defectCount: 1, criticalCount: 0, openCount: 1, pdfFilename: 'HSE-Rundgang_2026-10-08_HSE-RG-2026-001.pdf' });
+    expect(rows[0]).toMatchObject({ defectCount: 1, criticalCount: 0, openCount: 1, pdfFilename: 'HSE-RG_2026_10_08.pdf' });
   });
 
   it('groups legacy area labels under the three checklist headings on the dashboard', () => {

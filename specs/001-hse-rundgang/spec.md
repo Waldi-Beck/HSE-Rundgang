@@ -82,7 +82,7 @@ Alle App-Daten samt Fotos werden als versioniertes JSON gesichert und eingelesen
 - **FR-041**: Dexie erhält eine neue Schema-Version mit eindeutigem `docNr`-Index. Upgrade von Altversionen darf die App nicht abstürzen lassen; nicht abbildbare Testdaten dürfen verworfen werden. *(Betriebsanforderung)*
 - **FR-042**: JSON-Backup exportiert Rundgänge, Mängel, Nachkontrolle, Einstellungen, Prüftermine und Fotos. Formatversion wird erhöht; ältere Formate werden mit klarer Meldung abgewiesen. *(Datensicherung)*
 - **FR-043**: XLSX-Export enthält „Rundgänge“ und „Mängel“ in derselben Spaltenreihenfolge wie die Register; berechnete Werte werden mitexportiert. *(Excel-Blätter Rundgänge und Mängel)*
-- **FR-044**: PDF wird im Layout der Referenz ausgegeben, mit 2.1-Matrix QPS/QLabs/xTec, Textbewertungen OK/Mangel/n.a., Fotos und zusätzlichem Anhang. Bei wenigen Mängeln umfasst es zwei Seiten. Dateiname: `HSE-Rundgang_JJJJ-MM-TT_HSE-RG-JJJJ-NNN.pdf`. *(Formular Kapitel 1-4)*
+- **FR-044**: PDF wird im Layout der Referenz ausgegeben, mit 2.1-Matrix QPS/QLabs/QxTec, Textbewertungen OK/Mangel/n.a., Fotos und zusätzlichem Anhang. Dateiname und angezeigte PDF-Rundgang-Nr. sind `HSE-RG_JJJJ_MM_TT.pdf` / `HSE-RG_JJJJ_MM_TT`. Die interne Rundgang-ID bleibt unverändert. *(Formular Kapitel 1-4)*
 - **FR-045**: Auf jeder PDF-Seite sind QPS-Logo, `QPS_HSE_00064`, Titel `HSE Rundgang`, Version `1.0`, Gültig ab `05.10.2026`, Rundgangnummer und „Seite x von y“ vorhanden. Vorlagenreste werden ausgeschlossen. *(DOTX Kopf/Fusszeile; SOP_META)*
 
 ### Betrieb und Bedienbarkeit

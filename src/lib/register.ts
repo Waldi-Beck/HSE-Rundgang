@@ -75,7 +75,7 @@ export function roundRegisterRows(walks: Walk[], defects: Defect[], settings: Re
       defectCount: ownDefects.length,
       criticalCount: ownDefects.filter((defect) => defect.priority === 'K').length,
       openCount: ownDefects.filter((defect) => defect.status !== 'done').length,
-      pdfFilename: `HSE-Rundgang_${walk.date}_${walk.docNr}.pdf`,
+      pdfFilename: `HSE-RG_${walk.date.slice(0, 10).replaceAll('-', '_')}.pdf`,
       firstOfMonth,
       monthlyWarning: firstOfMonth && !walk.monthlyChecked,
     };

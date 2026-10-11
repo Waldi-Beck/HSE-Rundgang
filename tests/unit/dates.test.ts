@@ -28,7 +28,7 @@ describe('Register date IDs and report filenames', () => {
     expect(parseWalkNumber('QPS_HSE_00064')).toBeNull();
   });
   it('uses round date and immutable document number in the PDF name', () => {
-    expect(reportBaseName('2026-10-08', 'HSE-RG-2026-001')).toBe('HSE-Rundgang_2026-10-08_HSE-RG-2026-001');
+    expect(reportBaseName('2026-10-08', 'HSE-RG-2026-001')).toBe('HSE-RG_2026_10_08');
   });
 });
 
