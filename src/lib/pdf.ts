@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { autoTable, type CellHookData, type RowInput } from 'jspdf-autotable';
 import { QPS_LOGO_PNG, QPS_LOGO_RATIO } from '../assets/qpsLogo';
-import { FORM_AREAS, FORM_SUBTITLE, FORM_TITLE, INTERVAL_NOTICE, MONTHLY_ITEMS, MONTHLY_NOTICE, NOT_IN_WALK_TEXT, PRIORITY_NOTE, RATING_LABELS, RATING_LEGEND, SOP_META, WEEKLY_ITEMS, WEEKLY_NOTICE, areaLabel } from '../data/checklist';
+import { FORM_AREAS, FORM_TITLE, INTERVAL_NOTICE, MONTHLY_ITEMS, MONTHLY_NOTICE, NOT_IN_WALK_TEXT, PRIORITY_NOTE, RATING_LABELS, RATING_LEGEND, SOP_META, WEEKLY_ITEMS, WEEKLY_NOTICE, areaLabel } from '../data/checklist';
 import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../data/register';
 import { addDays, durationMinutes, formatDate, formatDuration, toISODate } from './dates';
 import { blobToDataUrl } from './image';
@@ -150,11 +150,6 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   doc.setFontSize(17);
   doc.setTextColor(...INK);
   doc.text(FORM_TITLE, MARGIN, y + 6);
-  const titleWidth = doc.getTextWidth(FORM_TITLE);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...MUTED);
-  doc.text(FORM_SUBTITLE, MARGIN + titleWidth + 2, y + 6);
   y += 9;
   doc.setFontSize(6.8);
   const intro = doc.splitTextToSize(`${INTERVAL_NOTICE} ${NOT_IN_WALK_TEXT}`, contentWidth);

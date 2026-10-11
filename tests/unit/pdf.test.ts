@@ -49,6 +49,7 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
     });
     const output = pdf.output();
     for (const text of ['QPS', 'QLabs', 'QxTec', 'OK', 'Mangel', 'n.a.']) expect(output).toContain(text);
+    expect(output).not.toContain('Formular');
   });
 
   it('separates old open measures from current-round defects and uses current-only outcome', async () => {
