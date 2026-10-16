@@ -1,9 +1,9 @@
-import { Check, FilePdf, LockSimple, Trash } from '@phosphor-icons/react';
+import { Check, EnvelopeSimple, FilePdf, LockSimple, Trash } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { RESULT_LABELS } from '../../data/register';
 import { closeWalk, deleteWalk, openDefectsBefore, updateWalk } from '../../db';
-import { exportWalkPdf } from '../../export';
+import { exportWalkPdf, shareWalkPdf } from '../../export';
 import { formatDate } from '../../lib/dates';
 import { suggestedResult } from '../../lib/register';
 import type { Defect, ResultKey, Signature, Walk } from '../../lib/types';
@@ -34,6 +34,8 @@ export function CloseTab({ walk, defects }: { walk: Walk; defects: Defect[] }) {
   const navigate = useNavigate();
   const [tried, setTried] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [sharingPdf, setSharingPdf] = useState(false);
+  const [emailFallback, setEmailFallback] = useState(false);
   const counts = countRatings(walk);
   const proposal = suggestedResult(defects);
   const errors = validateForClose(walk, defects, settings.areas);
@@ -57,6 +59,26 @@ export function CloseTab({ walk, defects }: { walk: Walk; defects: Defect[] }) {
     finally { setExporting(false); }
   };
 
+  const sharePdf = async () => {
+    setSharingPdf(true);
+    try {
+      const result = await shareWalkPdf(walk.id);
+      if (result.shared) {
+        toast('PDF wurde zum Teilen geöffnet.');
+      } else {
+        setEmailFallback(true);
+        toast('PDF heruntergeladen. Hänge es in deiner E-Mail als Anhang an.');
+      }
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') toast(`PDF teilen fehlgeschlagen: ${(error as Error).message}`);
+    } finally {
+      setSharingPdf(false);
+    }
+  };
+
+  const emailSubject = encodeURIComponent(`HSE-Rundgang ${walk.docNr}`);
+  const emailBody = encodeURIComponent(`Anbei der HSE-Rundgang ${walk.docNr} als PDF.`);
+
   const remove = async () => {
     if (!confirm('Entwurf mit allen Mängeln und Fotos endgültig löschen?')) return;
     await deleteWalk(walk.id);
@@ -66,7 +88,7 @@ export function CloseTab({ walk, defects }: { walk: Walk; defects: Defect[] }) {
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-line bg-surface p-4">
-        <h2 className="text-lg font-semibold">4. Abschluss</h2>
+        <h2 className="text-lg font-semibold">3. Abschluss</h2>
         <p className="mt-1 text-sm text-muted">{counts.checked} von {counts.total} Feldern bewertet · {defects.length} Mängel · {defects.filter((defect) => defect.priority === 'K').length} kritisch.</p>
         <fieldset className="mt-4">
           <legend className="label">Gesamtbewertung</legend>
@@ -95,8 +117,10 @@ export function CloseTab({ walk, defects }: { walk: Walk; defects: Defect[] }) {
 
       <div className="flex flex-col gap-2 sm:flex-row">
         {!readOnly && <button type="button" className="btn-primary flex-1" onClick={() => void complete()} data-testid="close-walk"><LockSimple size={18} aria-hidden />Rundgang abschliessen</button>}
+        <button type="button" className="btn-secondary flex-1" onClick={() => void sharePdf()} disabled={sharingPdf} data-testid="share-pdf"><EnvelopeSimple size={19} aria-hidden />{sharingPdf ? 'PDF wird vorbereitet' : 'PDF per E-Mail teilen'}</button>
         <button type="button" className="btn-secondary flex-1" onClick={() => void downloadPdf()} disabled={exporting} data-testid="export-pdf"><FilePdf size={20} aria-hidden />{exporting ? 'PDF wird erstellt' : 'PDF exportieren'}</button>
       </div>
+      {emailFallback && <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-muted">Das PDF wurde heruntergeladen. <a className="font-semibold text-accent underline" href={`mailto:?subject=${emailSubject}&body=${emailBody}`}>E-Mail öffnen</a> und die PDF-Datei aus deinen Downloads anhängen.</p>}
       {!readOnly && <button type="button" onClick={() => void remove()} className="mx-auto flex min-h-10 items-center gap-1.5 text-sm font-medium text-danger"><Trash size={16} aria-hidden />Entwurf löschen</button>}
     </div>
   );

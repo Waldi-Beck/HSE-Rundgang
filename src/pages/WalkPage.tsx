@@ -10,14 +10,12 @@ import { DefectSheet } from '../components/DefectSheet';
 import { Badge, EmptyState } from '../components/ui';
 import { DataTab } from './walk/DataTab';
 import { ChecklistTab } from './walk/ChecklistTab';
-import { DefectsTab } from './walk/DefectsTab';
 import { CloseTab } from './walk/CloseTab';
 
 const TABS = [
   { key: 'daten', label: '1. Daten' },
   { key: 'checkliste', label: '2. Checkliste' },
-  { key: 'maengel', label: '3. Mängel' },
-  { key: 'abschluss', label: '4. Abschluss' },
+  { key: 'abschluss', label: '3. Abschluss' },
 ] as const;
 
 export function WalkPage() {
@@ -42,6 +40,7 @@ export function WalkPage() {
       </EmptyState>
     );
   }
+  if (tab === 'maengel') return <Navigate to={`/rundgang/${id}/checkliste`} replace />;
   if (!TABS.some((t) => t.key === tab)) return <Navigate to={`/rundgang/${id}/daten`} replace />;
 
   const c = countRatings(walk);
@@ -72,7 +71,7 @@ export function WalkPage() {
         <div className="mt-2 h-1 overflow-hidden rounded-full bg-line" aria-hidden>
           <div className="h-full bg-accent transition-[width]" style={{ width: `${c.total ? (c.checked / c.total) * 100 : 0}%` }} />
         </div>
-        <nav aria-label="Kapitel" className="-mx-1 mt-1 grid grid-cols-4">
+        <nav aria-label="Kapitel" className="-mx-1 mt-1 grid grid-cols-3">
           {TABS.map((t) => (
             <NavLink
               key={t.key}
@@ -85,7 +84,6 @@ export function WalkPage() {
               }
             >
               {t.label}
-              {t.key === 'maengel' && defects.length > 0 && <span className="ml-1 text-xs tabular-nums text-muted">({defects.length})</span>}
             </NavLink>
           ))}
         </nav>
@@ -94,7 +92,6 @@ export function WalkPage() {
       <div className="pt-4">
         {tab === 'daten' && <DataTab walk={walk} />}
         {tab === 'checkliste' && <ChecklistTab walk={walk} defects={defects} onNewDefect={openNewDefect} onEditDefect={setEditing} />}
-        {tab === 'maengel' && <DefectsTab walk={walk} defects={defects} onNewDefect={openNewDefect} onEditDefect={setEditing} />}
         {tab === 'abschluss' && <CloseTab walk={walk} defects={defects} />}
       </div>
 

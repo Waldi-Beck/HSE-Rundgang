@@ -6,7 +6,7 @@ import type { Defect, Walk } from '../../lib/types';
 import { DefectRow } from '../../components/DefectRow';
 import { EmptyState } from '../../components/ui';
 
-/** Kapitel 3 Mängel und Massnahmen aus dem aktuellen Formular. */
+/** Mängel und Massnahmen aus dem aktuellen Formular. */
 export function DefectsTab({
   walk,
   defects,
@@ -28,7 +28,7 @@ export function DefectsTab({
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">3. Mängel und Massnahmen</h2>
+          <h2 className="text-lg font-semibold">Mängel und Massnahmen</h2>
           <p className="text-sm text-muted">Mangel-ID, Abteilung, Gefahr, Massnahmen und Foto.</p>
         </div>
         {!ro && (

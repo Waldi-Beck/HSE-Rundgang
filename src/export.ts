@@ -11,7 +11,7 @@ export async function reportFileBase(walk: Walk): Promise<string> {
   return reportBaseName(walk.date, walk.docNr);
 }
 
-export async function exportWalkPdf(walkId: string): Promise<string> {
+async function createWalkPdf(walkId: string): Promise<{ filename: string; blob: Blob }> {
   const walk = await db.walks.get(walkId);
   if (!walk) throw new Error('Rundgang nicht gefunden.');
   const defects = (await db.defects.where('walkId').equals(walkId).toArray()).sort((a, b) => a.nr - b.nr);
@@ -23,8 +23,26 @@ export async function exportWalkPdf(walkId: string): Promise<string> {
   const [settings] = await Promise.all([db.settings.get('app')]);
   const pdf = await buildReportPdf({ walk, defects, photos, openFromPrevious, fileBaseName, settings: settings ?? DEFAULT_REGISTER_SETTINGS });
   const filename = `${fileBaseName}.pdf`;
-  downloadBlob(pdf.output('blob'), filename);
+  return { filename, blob: pdf.output('blob') };
+}
+
+export async function exportWalkPdf(walkId: string): Promise<string> {
+  const { filename, blob } = await createWalkPdf(walkId);
+  downloadBlob(blob, filename);
   return filename;
+}
+
+export async function shareWalkPdf(walkId: string): Promise<{ filename: string; shared: boolean }> {
+  const walk = await db.walks.get(walkId);
+  if (!walk) throw new Error('Rundgang nicht gefunden.');
+  const { filename, blob } = await createWalkPdf(walkId);
+  const file = new File([blob], filename, { type: 'application/pdf' });
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    await navigator.share({ files: [file], title: `HSE-Rundgang ${walk.docNr}`, text: 'HSE-Rundgang als PDF' });
+    return { filename, shared: true };
+  }
+  downloadBlob(blob, filename);
+  return { filename, shared: false };
 }
 
 export async function exportRegisterXlsx(): Promise<string> {

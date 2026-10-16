@@ -28,8 +28,11 @@ export function ChecklistTab({ walk, defects, onNewDefect, onEditDefect }: {
   const monthlyKeys = MONTHLY_ITEMS.map((item) => item.id);
   const weeklyRatings = countRatings(walk, weeklyKeys());
   const monthlyRatings = countRatings(walk, monthlyKeys);
+  const requiredRatings = countRatings(walk);
   const areaCounts = FORM_AREAS.map((area) => ({ area, ...countRatings(walk, weeklyKeys(area.id)) }));
   const allAreasChecked = areaCounts.every((item) => item.checked === item.total);
+  const monthlyAreasChecked = !walk.monthlyChecked || MONTHLY_ITEMS.every((item) => !!walk.monthlyAreas[item.id]);
+  const canContinueToClose = allAreasChecked && requiredRatings.checked === requiredRatings.total && monthlyAreasChecked;
 
   useEffect(() => {
     const expected = view === 'monthly' ? 'monatlich' : 'wöchentlich';
@@ -53,6 +56,14 @@ export function ChecklistTab({ walk, defects, onNewDefect, onEditDefect }: {
   const backToAreas = () => {
     setParams({ bereich: 'wöchentlich' }, { replace: true });
     window.scrollTo({ top: 0 });
+  };
+
+  const continueFromArea = () => {
+    if (canContinueToClose) {
+      navigate(`/rundgang/${walk.id}/abschluss`);
+      return;
+    }
+    backToAreas();
   };
 
   const rateWeekly = (itemId: string, area: FormAreaId, value: Rating | undefined) => {
@@ -103,8 +114,8 @@ export function ChecklistTab({ walk, defects, onNewDefect, onEditDefect }: {
           ))}
         </div>
       </section>
-      <button type="button" className="btn-primary w-full" data-testid="continue-to-defects" disabled={!allAreasChecked} onClick={() => navigate(`/rundgang/${walk.id}/maengel`)}>
-        {allAreasChecked ? 'Weiter zu Mängeln' : 'Bitte zuerst alle drei Abteilungen prüfen'}
+      <button type="button" className="btn-primary w-full" data-testid="continue-to-close" disabled={!canContinueToClose} onClick={() => navigate(`/rundgang/${walk.id}/abschluss`)}>
+        {canContinueToClose ? 'Weiter zum Abschluss' : allAreasChecked ? 'Bitte zuerst alle Checklistenpunkte bewerten' : 'Bitte zuerst alle drei Abteilungen prüfen'}
       </button>
       {walk.monthlyChecked && <button type="button" className="btn-secondary w-full" data-testid="area-tab-monthly" onClick={() => goTo('monthly')}>
         2.2 Monatliche Checkliste <span className="ml-1 text-xs tabular-nums text-muted">{monthlyRatings.checked}/{monthlyRatings.total}</span>
@@ -132,7 +143,7 @@ export function ChecklistTab({ walk, defects, onNewDefect, onEditDefect }: {
       <div className="rounded-lg border border-line bg-surface px-3 py-2 text-sm" aria-label="Bewertungslegende">
         <span className="font-semibold">Bewertung</span><span className="mx-2 hidden text-muted sm:inline">│</span>
         <span className="ml-2"><strong className="text-accent">OK</strong> = in Ordnung</span>
-        <span className="ml-3"><strong className="text-danger">Mangel</strong> = in Kapitel 3 erfassen (Punkt + Bereich)</span>
+        <span className="ml-3"><strong className="text-danger">Mangel</strong> = Mangel direkt für diese Abteilung erfassen</span>
         <span className="ml-3"><strong>n.a.</strong> = nicht vorhanden / nicht begangen</span>
       </div>
       <section aria-labelledby="weekly-checklist-title" className="overflow-hidden rounded-xl border border-line bg-surface">
@@ -177,7 +188,9 @@ export function ChecklistTab({ walk, defects, onNewDefect, onEditDefect }: {
       {!readOnly && <button type="button" className="btn-secondary w-full" data-testid="add-department-defect" onClick={() => onNewDefect('SONSTIGES', selectedArea.id)}>
         <Plus size={18} aria-hidden /> Weiteren Mangel in {selectedArea.label} erfassen
       </button>}
-      <button type="button" className="btn-primary w-full" data-testid="next-department" onClick={backToAreas}>Fertig – nächste Abteilung wählen →</button>
+      <button type="button" className="btn-primary w-full" data-testid="next-department" onClick={continueFromArea}>
+        {canContinueToClose ? 'Alle Abteilungen geprüft – weiter zum Abschluss →' : 'Fertig – nächste Abteilung wählen →'}
+      </button>
     </>}
     {view === 'monthly' && <button type="button" className="btn-secondary w-full" onClick={() => goTo('weekly')}>Zur Abteilung-Checkliste</button>}
   </div>;
