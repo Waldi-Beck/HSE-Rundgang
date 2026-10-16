@@ -1,6 +1,6 @@
 import { CheckCircle, Plus } from '@phosphor-icons/react';
 import { useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { FORM_AREAS, MONTHLY_ITEMS, MONTHLY_NOTICE, WEEKLY_ITEMS, WEEKLY_NOTICE, areaLabel, type FormAreaId } from '../../data/checklist';
 import { patchMonthlyAreas, patchRatings } from '../../db';
 import type { Defect, Rating, Walk } from '../../lib/types';
@@ -19,12 +19,17 @@ export function ChecklistTab({ walk, defects, onNewDefect, onEditDefect }: {
 }) {
   const readOnly = walk.status === 'closed';
   const toast = useToast();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const requested = params.get('bereich');
   const view: ViewId = requested === 'monatlich' && walk.monthlyChecked ? 'monthly' : 'weekly';
+  const requestedArea = params.get('abteilung');
+  const selectedArea = FORM_AREAS.find((area) => area.id === requestedArea);
   const monthlyKeys = MONTHLY_ITEMS.map((item) => item.id);
   const weeklyRatings = countRatings(walk, weeklyKeys());
   const monthlyRatings = countRatings(walk, monthlyKeys);
+  const areaCounts = FORM_AREAS.map((area) => ({ area, ...countRatings(walk, weeklyKeys(area.id)) }));
+  const allAreasChecked = areaCounts.every((item) => item.checked === item.total);
 
   useEffect(() => {
     const expected = view === 'monthly' ? 'monatlich' : 'wöchentlich';
@@ -32,7 +37,21 @@ export function ChecklistTab({ walk, defects, onNewDefect, onEditDefect }: {
   }, [requested, setParams, view]);
 
   const goTo = (next: ViewId) => {
-    setParams({ bereich: next === 'monthly' ? 'monatlich' : 'wöchentlich' }, { replace: true });
+    setParams((current) => {
+      const nextParams = new URLSearchParams(current);
+      nextParams.set('bereich', next === 'monthly' ? 'monatlich' : 'wöchentlich');
+      return nextParams;
+    }, { replace: true });
+    window.scrollTo({ top: 0 });
+  };
+
+  const chooseArea = (area: FormAreaId) => {
+    setParams({ bereich: 'wöchentlich', abteilung: area }, { replace: true });
+    window.scrollTo({ top: 0 });
+  };
+
+  const backToAreas = () => {
+    setParams({ bereich: 'wöchentlich' }, { replace: true });
     window.scrollTo({ top: 0 });
   };
 
@@ -68,14 +87,45 @@ export function ChecklistTab({ walk, defects, onNewDefect, onEditDefect }: {
     void patchRatings(walk.id, patch);
   };
 
+  if (!selectedArea && view === 'weekly') {
+    return <div className="space-y-4">
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Abteilung auswählen</h2>
+          <p className="mt-1 text-sm text-muted">Wähle eine Abteilung, prüfe dort die Checkliste und erfasse zusätzliche Mängel direkt für diese Abteilung.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3" data-testid="department-picker">
+          {areaCounts.map(({ area, checked, total }) => (
+            <button key={area.id} type="button" data-testid={`select-area-${area.id}`} onClick={() => chooseArea(area.id)} className="flex min-h-24 flex-col items-start justify-between rounded-xl border border-line bg-surface p-4 text-left hover:border-accent">
+              <span className="font-semibold">{area.label}</span>
+              <span className="text-sm text-muted">{checked === total ? '✓ ' : ''}{checked} / {total} Punkte bewertet</span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <button type="button" className="btn-primary w-full" data-testid="continue-to-defects" disabled={!allAreasChecked} onClick={() => navigate(`/rundgang/${walk.id}/maengel`)}>
+        {allAreasChecked ? 'Weiter zu Mängeln' : 'Bitte zuerst alle drei Abteilungen prüfen'}
+      </button>
+      {walk.monthlyChecked && <button type="button" className="btn-secondary w-full" data-testid="area-tab-monthly" onClick={() => goTo('monthly')}>
+        2.2 Monatliche Checkliste <span className="ml-1 text-xs tabular-nums text-muted">{monthlyRatings.checked}/{monthlyRatings.total}</span>
+      </button>}
+    </div>;
+  }
+
   return <div className="space-y-4">
-    <div className="flex flex-wrap gap-2" role="tablist" aria-label="Checklistenabschnitte">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      {view === 'weekly' && selectedArea && <div className="flex items-center gap-2">
+        <button type="button" className="btn-secondary" onClick={backToAreas} data-testid="back-to-departments">← Abteilungen</button>
+        <span className="font-semibold">{selectedArea.label}</span>
+      </div>}
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Checklistenabschnitte">
       <button type="button" role="tab" aria-selected={view === 'weekly'} data-testid="area-tab-weekly" onClick={() => goTo('weekly')} className={`min-h-11 rounded-lg border px-4 text-sm font-semibold ${view === 'weekly' ? 'border-accent bg-accent-soft' : 'border-line-strong bg-surface'}`}>
-        2.1 Bei jedem Rundgang <span className="ml-1 text-xs tabular-nums text-muted">{weeklyRatings.checked}/{weeklyRatings.total}</span>
+        2.1 Bei jedem Rundgang <span className="ml-1 text-xs tabular-nums text-muted">{selectedArea ? areaCounts.find((item) => item.area.id === selectedArea.id)?.checked : weeklyRatings.checked}/{selectedArea ? areaCounts.find((item) => item.area.id === selectedArea.id)?.total : weeklyRatings.total}</span>
       </button>
       {walk.monthlyChecked && <button type="button" role="tab" aria-selected={view === 'monthly'} data-testid="area-tab-monthly" onClick={() => goTo('monthly')} className={`min-h-11 rounded-lg border px-4 text-sm font-semibold ${view === 'monthly' ? 'border-accent bg-accent-soft' : 'border-line-strong bg-surface'}`}>
         2.2 Monatlich <span className="ml-1 text-xs tabular-nums text-muted">{monthlyRatings.checked}/{monthlyRatings.total}</span>
       </button>}
+      </div>
     </div>
 
     {view === 'weekly' ? <>
@@ -94,30 +144,28 @@ export function ChecklistTab({ walk, defects, onNewDefect, onEditDefect }: {
             <thead className="bg-surface-2 text-xs"><tr>
               <th scope="col" className="w-14 border-b border-r border-line px-3 py-2.5">Nr.</th>
               <th scope="col" className="min-w-[180px] border-b border-r border-line px-3 py-2.5 sm:min-w-[330px]">Kontrollpunkt</th>
-              {FORM_AREAS.map((area) => {
-                const areaCounts = countRatings(walk, weeklyKeys(area.id));
-                return <th scope="col" key={area.id} className="w-[145px] border-b border-r border-line px-2 py-2 text-center last:border-r-0 sm:w-[190px]">
-                <div className="flex items-center justify-center gap-1 font-semibold">{areaCounts.checked === areaCounts.total && <CheckCircle size={13} weight="fill" className="text-accent" aria-hidden />}{area.label}<span data-testid={`weekly-count-${area.id}`} className="text-[10px] font-normal tabular-nums text-muted">{areaCounts.checked}/{areaCounts.total}</span></div>
-                {!readOnly && <button type="button" data-testid={`rest-ok-${area.id}`} onClick={() => restOkForArea(area.id)} className="mt-1 min-h-8 text-[11px] font-medium text-accent underline underline-offset-2">Rest OK</button>}
-              </th>;
-              })}
+              {selectedArea && <th scope="col" className="w-[190px] border-b border-r border-line px-2 py-2 text-center last:border-r-0">
+                <div className="flex items-center justify-center gap-1 font-semibold">{areaCounts.find((item) => item.area.id === selectedArea.id)?.checked === WEEKLY_ITEMS.length && <CheckCircle size={13} weight="fill" className="text-accent" aria-hidden />}{selectedArea.label}<span data-testid={`weekly-count-${selectedArea.id}`} className="text-[10px] font-normal tabular-nums text-muted">{areaCounts.find((item) => item.area.id === selectedArea.id)?.checked}/{WEEKLY_ITEMS.length}</span></div>
+                {!readOnly && <button type="button" data-testid={`rest-ok-${selectedArea.id}`} onClick={() => restOkForArea(selectedArea.id)} className="mt-1 min-h-8 text-[11px] font-medium text-accent underline underline-offset-2">Rest OK</button>}
+              </th>}
             </tr></thead>
             <tbody className="divide-y divide-line">
               {WEEKLY_ITEMS.map((item) => <tr key={item.id} data-testid={`weekly-row-${item.id}`}>
                 <th scope="row" className="border-r border-line px-3 py-2 align-top text-xs font-semibold tabular-nums">{item.id}</th>
                 <td className="border-r border-line px-3 py-2 align-top"><div className="font-medium leading-snug">{item.text}</div><details className="mt-1 text-[11px] text-muted"><summary className="cursor-pointer">Grundlage</summary><p className="mt-1 leading-relaxed">{item.basis}</p></details></td>
-                {FORM_AREAS.map((area) => {
+                {selectedArea && (() => {
+                  const area = selectedArea;
                   const key = cellKey(item.id, area.id);
                   const linked = defectsForCell(key, defects);
                   const rating = walk.ratings[key];
-                  return <td key={area.id} className={`w-[145px] border-r border-line px-2 py-2 align-middle last:border-r-0 sm:w-[190px] ${rating === 'mangel' ? 'bg-danger-soft/50' : ''}`}>
-                    <RatingControl itemId={key} label={`${item.id} ${area.label}`} value={rating} disabled={readOnly} compact onChange={(value) => rateWeekly(item.id, area.id, value)} />
+                  return <td key={area.id} className={`w-[190px] border-r border-line px-2 py-2 align-middle last:border-r-0 ${rating === 'mangel' ? 'bg-danger-soft/50' : ''}`}>
+                    <RatingControl itemId={key} label={`${item.id} ${area.label}`} value={rating} disabled={readOnly} onChange={(value) => rateWeekly(item.id, area.id, value)} />
                     {(rating === 'mangel' || linked.length > 0) && <div className="mt-1 flex flex-wrap justify-center gap-1">
                       {linked.map((defect) => <button key={defect.id} type="button" onClick={() => onEditDefect(defect)} className="min-h-7 rounded border border-line-strong bg-surface px-1.5 text-[10px] font-medium">{defect.mangelId}</button>)}
                       {linked.length === 0 && <button type="button" onClick={() => onNewDefect(item.id, area.id)} className="inline-flex min-h-7 items-center gap-0.5 text-[10px] font-medium text-danger"><Plus size={12} aria-hidden /> Mangel erfassen</button>}
                     </div>}
                   </td>;
-                })}
+                })()}
               </tr>)}
             </tbody>
           </table>
@@ -125,7 +173,13 @@ export function ChecklistTab({ walk, defects, onNewDefect, onEditDefect }: {
       </section>
     </> : <MonthlyChecklist walk={walk} defects={defects} readOnly={readOnly} onRate={rateMonthly} onEditDefect={onEditDefect} restOk={restOkMonthly} />}
 
-    <Link to={`/rundgang/${walk.id}/maengel`} replace className="btn-primary w-full" data-testid="continue-to-defects">Weiter zu Mängeln</Link>
+    {view === 'weekly' && selectedArea && <>
+      {!readOnly && <button type="button" className="btn-secondary w-full" data-testid="add-department-defect" onClick={() => onNewDefect('SONSTIGES', selectedArea.id)}>
+        <Plus size={18} aria-hidden /> Weiteren Mangel in {selectedArea.label} erfassen
+      </button>}
+      <button type="button" className="btn-primary w-full" data-testid="next-department" onClick={backToAreas}>Fertig – nächste Abteilung wählen →</button>
+    </>}
+    {view === 'monthly' && <button type="button" className="btn-secondary w-full" onClick={() => goTo('weekly')}>Zur Abteilung-Checkliste</button>}
   </div>;
 }
 

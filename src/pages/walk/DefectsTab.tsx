@@ -29,7 +29,7 @@ export function DefectsTab({
       <div className="flex items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">3. Mängel und Massnahmen</h2>
-          <p className="text-sm text-muted">Mangel-ID, Kontrollpunkt, Bereich, Gefahr, Massnahmen und Foto.</p>
+          <p className="text-sm text-muted">Mangel-ID, Abteilung, Gefahr, Massnahmen und Foto.</p>
         </div>
         {!ro && (
           <button type="button" className="btn-secondary shrink-0" onClick={() => onNewDefect()}>

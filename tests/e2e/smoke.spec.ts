@@ -8,11 +8,19 @@ const ROOMS = ['qps', 'qlabs', 'xtec'];
 
 async function restOkEverywhere(page: import('@playwright/test').Page) {
   for (const room of ROOMS) {
+    await page.getByTestId(`select-area-${room}`).click();
     const rest = page.getByTestId(`rest-ok-${room}`);
     await expect(rest).toBeVisible();
     await rest.click();
     await expect(page.getByTestId(`weekly-count-${room}`)).toHaveText('15/15');
+    await page.getByTestId('next-department').click();
   }
+}
+
+async function finishSelectedArea(page: import('@playwright/test').Page, room: string) {
+  await page.getByTestId(`rest-ok-${room}`).click();
+  await expect(page.getByTestId(`weekly-count-${room}`)).toHaveText('15/15');
+  await page.getByTestId('next-department').click();
 }
 
 async function sign(page: import('@playwright/test').Page) {
@@ -49,9 +57,14 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await expect(page.getByTestId('monthly-checked')).toBeChecked();
   await page.getByTestId('to-checklist').click();
 
+  await expect(page.getByTestId('department-picker')).toBeVisible();
+  await page.getByTestId('select-area-qps').click();
   await expect(page.getByTestId('weekly-checklist-matrix')).toBeVisible();
-  for (const room of ROOMS) await expect(page.getByRole('columnheader', { name: new RegExp(room, 'i') }).first()).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: /QPS/ })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: /QLabs/ })).toHaveCount(0);
   await expect(page.getByTestId('area-tab-monthly')).toBeVisible();
+  await finishSelectedArea(page, 'qps');
+  await page.getByTestId('select-area-qlabs').click();
   await page.getByTestId('weekly-row-R4').locator('summary').click();
   await expect(page.getByText('VKF-Brandschutzvorschriften (BSV 2015)').first()).toBeVisible();
   await page.getByTestId('rate-R4@qlabs-mangel').click();
@@ -72,8 +85,20 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await sheet.getByTestId('defect-save').click();
   await expect(sheet).toHaveCount(0);
 
-  await restOkEverywhere(page);
-  for (const room of ROOMS) await expect(page.getByTestId(`weekly-count-${room}`)).toHaveText('15/15');
+  await page.getByTestId('add-department-defect').click();
+  const departmentSheet = page.getByRole('dialog');
+  await expect(departmentSheet.getByLabel('Bereich')).toHaveValue('qlabs');
+  await departmentSheet.getByLabel('Beschreibung des Mangels').fill('Zusätzlicher Mangel direkt in QLabs');
+  await departmentSheet.getByLabel('Festgestellte Gefahr').fill('Gefahr ausserhalb eines Listenpunkts');
+  await departmentSheet.getByTestId('prio-M').click();
+  await departmentSheet.getByTestId('defect-save').click();
+  await expect(departmentSheet).toHaveCount(0);
+
+  await finishSelectedArea(page, 'qlabs');
+  await page.getByTestId('select-area-xtec').click();
+  await finishSelectedArea(page, 'xtec');
+
+  await page.getByTestId('select-area-xtec').click();
   await page.getByTestId('weekly-checklist-matrix').evaluate((table) => table.parentElement?.scrollTo({ left: 0 }));
   await page.evaluate(() => window.scrollTo({ top: 0 }));
   await page.screenshot({ path: `${shots}/01-checkliste.png` });
@@ -97,6 +122,8 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   }
   const monthlyRest = page.getByTestId('rest-ok');
   if (await monthlyRest.count()) await monthlyRest.click();
+  await page.getByTestId('area-tab-weekly').click();
+  await page.getByTestId('next-department').click();
   await page.getByTestId('continue-to-defects').click();
   await expect(page.getByRole('heading', { name: '3. Mängel und Massnahmen' })).toBeVisible();
   await page.getByRole('button', { name: 'Mangel', exact: true }).click();
