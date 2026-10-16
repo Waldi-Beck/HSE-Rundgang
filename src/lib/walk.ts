@@ -14,6 +14,8 @@ export function parseCellKey(key: string): { itemId: string; area: string } {
 
 export const isWeeklyItem = (itemId: string) => /^R(?:[1-9]|1[0-5])$/.test(itemId);
 export const isMonthlyItem = (itemId: string) => /^M[1-9]$/.test(itemId);
+export const isOtherFinding = (itemId: string) => itemId === 'SONSTIGES';
+export const defectItemLabel = (itemId: string) => isOtherFinding(itemId) ? 'Sonstiges (nicht in Checkliste)' : itemId;
 
 export function weeklyKeys(area?: string): string[] {
   const areas = area ? [area] : FORM_AREAS.map((formArea) => formArea.id);
@@ -65,8 +67,8 @@ export function defectsForCell<T extends Pick<Defect, 'itemId' | 'area'>>(key: s
 export function mangelWithoutDefect(walk: Pick<Walk, 'ratings' | 'monthlyChecked' | 'monthlyAreas'>, defects: Pick<Defect, 'itemId' | 'area'>[]): string[] {
   return requiredRatingKeys(walk.monthlyChecked).flatMap((key) => {
     if (walk.ratings[key] !== 'mangel') return [];
-    const areaKey = isMonthlyItem(key) ? cellKey(key, walk.monthlyAreas[key] ?? '') : key;
-    return defectsForCell(areaKey, defects).length ? [] : [areaKey];
+    if (isMonthlyItem(key)) return defects.some((defect) => defect.itemId === key) ? [] : [key];
+    return defectsForCell(key, defects).length ? [] : [key];
   });
 }
 
@@ -78,7 +80,8 @@ export function cellLabel(key: string): string {
 
 export function defectPointLabel(defect: Pick<Defect, 'itemId' | 'area'>): string {
   const formArea = FORM_AREAS.find((candidate) => candidate.id === defect.area);
-  return defect.area ? `${defect.itemId} / ${formArea?.label ?? areaLabel(defect.area)}` : defect.itemId;
+  const itemLabel = defectItemLabel(defect.itemId);
+  return defect.area ? `${itemLabel} / ${formArea?.label ?? areaLabel(defect.area)}` : itemLabel;
 }
 
 export function nextDefectNr(defects: Pick<Defect, 'nr'>[]): number {
@@ -100,6 +103,12 @@ export function defectMissingFields(defect: Pick<Defect, 'itemId' | 'area' | 'de
 }
 
 export function defectAreaValid(defect: Pick<Defect, 'itemId' | 'area'>, registerAreas: string[] = [...REGISTER_AREA_DEFAULTS]): boolean {
+  if (isOtherFinding(defect.itemId)) {
+    return FORM_AREAS.some((area) => area.id === defect.area);
+  }
+  if (isMonthlyItem(defect.itemId)) {
+    return FORM_AREAS.some((area) => area.id === defect.area) || registerAreas.includes(defect.area);
+  }
   return areasForItem(defect.itemId, registerAreas).some((area) => area.id === defect.area);
 }
 
@@ -123,7 +132,7 @@ export function validateForClose(walk: Walk, defects: Defect[], registerAreas: s
   for (const defect of defects) {
     const missing = defectMissingFields(defect);
     if (missing.length) errors.push(`Mangel Nr. ${defect.nr}: ${missing.join(', ')} fehlt.`);
-    else if (!CHECKLIST_ITEM_BY_ID.has(defect.itemId)) errors.push(`Mangel Nr. ${defect.nr}: Kontrollpunkt ${defect.itemId} unbekannt.`);
+    else if (!isOtherFinding(defect.itemId) && !CHECKLIST_ITEM_BY_ID.has(defect.itemId)) errors.push(`Mangel Nr. ${defect.nr}: Kontrollpunkt ${defect.itemId} unbekannt.`);
     else if (!defectAreaValid(defect, registerAreas)) errors.push(`Mangel Nr. ${defect.nr}: Bereich passt nicht zu ${defect.itemId}.`);
   }
   if (!walk.result) errors.push('Gesamtbewertung fehlt (Kapitel 4).');

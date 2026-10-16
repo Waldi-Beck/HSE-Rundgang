@@ -27,7 +27,7 @@ export function WalkPage() {
   const [editing, setEditing] = useState<Defect | null>(null);
 
   const openNewDefect = useCallback(
-    (itemId = '', area = '') => walk && defects && setEditing(newDefectDraft(walk, defects, itemId, area)),
+    (itemId = '', area = '') => walk && defects && setEditing(newDefectDraft(walk, defects, itemId || 'SONSTIGES', area)),
     [walk, defects],
   );
   const closeSheet = useCallback(() => setEditing(null), []);

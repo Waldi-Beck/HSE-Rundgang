@@ -4,6 +4,7 @@ import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../da
 import { displayWalkNumber, isoWeek } from './dates';
 import { defectDaysOpen, roundRegisterRows, validDefectDue } from './register';
 import type { Defect, RegisterSettings, Walk } from './types';
+import { defectItemLabel } from './walk';
 
 export interface RegisterWorkbookInput {
   walks: Walk[];
@@ -110,7 +111,7 @@ export async function buildRegisterWorkbook(input: RegisterWorkbookInput): Promi
       week ? `${week.year}-KW${String(week.week).padStart(2, '0')}` : '',
       defect.nr,
       areaLabel(defect.area, settings.areas),
-      defect.itemId,
+      defectItemLabel(defect.itemId),
       defect.description,
       defect.hazard,
       PRIORITY_KEY_TO_TEXT[defect.priority],

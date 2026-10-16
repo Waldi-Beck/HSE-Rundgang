@@ -58,7 +58,7 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
 
   const sheet = page.getByRole('dialog');
   await expect(sheet.getByRole('heading', { name: /Mangel 2026-\d{2}-\d{2}-M01/ })).toBeVisible();
-  await expect(sheet.getByLabel('Kontrollpunkt')).toHaveValue('R4');
+  await expect(sheet.getByLabel('Kontrollpunkt')).toHaveCount(0);
   await expect(sheet.getByLabel('Bereich')).toHaveValue('qlabs');
   await sheet.getByLabel('Beschreibung des Mangels').fill('Feuerlöscher hinter Material abgestellt');
   await sheet.getByLabel('Festgestellte Gefahr').fill('Löscher im Ereignisfall nicht erreichbar');
@@ -81,8 +81,8 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await page.getByLabel('Bereich M1').selectOption({ label: 'QLabs' });
   await page.getByTestId('rate-M1-mangel').click();
   const monthlySheet = page.getByRole('dialog');
-  await expect(monthlySheet.getByLabel('Kontrollpunkt')).toHaveValue('M1');
-  await expect(monthlySheet.getByLabel('Bereich')).toHaveValue('QLabs');
+  await expect(monthlySheet.getByLabel('Kontrollpunkt')).toHaveCount(0);
+  await expect(monthlySheet.getByLabel('Bereich')).toHaveValue('qlabs');
   await monthlySheet.getByLabel('Beschreibung des Mangels').fill('Inhalt des Erste-Hilfe-Kastens unvollständig');
   await monthlySheet.getByLabel('Festgestellte Gefahr').fill('Material für erste Hilfe fehlt');
   await monthlySheet.getByLabel('Verantwortlich').fill('Max Muster');
@@ -97,7 +97,19 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   }
   const monthlyRest = page.getByTestId('rest-ok');
   if (await monthlyRest.count()) await monthlyRest.click();
-  await page.getByRole('link', { name: /3\. Mängel/ }).click();
+  await page.getByTestId('continue-to-defects').click();
+  await expect(page.getByRole('heading', { name: '3. Mängel und Massnahmen' })).toBeVisible();
+  await page.getByRole('button', { name: 'Mangel', exact: true }).click();
+  const otherSheet = page.getByRole('dialog');
+  await expect(otherSheet.getByLabel('Kontrollpunkt')).toHaveCount(0);
+  await otherSheet.getByLabel('Bereich').selectOption('qps');
+  await expect(otherSheet.getByLabel('Bereich').locator('option')).toHaveCount(4);
+  await otherSheet.getByLabel('Beschreibung des Mangels').fill('Auffälligkeit ausserhalb der Checkliste');
+  await otherSheet.getByLabel('Festgestellte Gefahr').fill('Zusätzliche Gefahr erkannt');
+  await otherSheet.getByTestId('prio-M').click();
+  await otherSheet.getByTestId('defect-save').click();
+  await expect(otherSheet).toHaveCount(0);
+  await expect(page.getByText('Auffälligkeit ausserhalb der Checkliste')).toBeVisible();
   await expect(page.getByText(/2026-\d{2}-\d{2}-M01/).first()).toBeVisible();
   await page.getByTestId('continue-to-close').click();
   await expect(page.getByRole('heading', { name: '4. Abschluss' })).toBeVisible();
@@ -145,6 +157,8 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await page.getByLabel('Uhrzeit Ende').fill(secondEndTime);
   await page.getByTestId('to-checklist').click();
   await restOkEverywhere(page);
+  await page.getByTestId('continue-to-defects').click();
+  await expect(page.getByRole('heading', { name: '3. Mängel und Massnahmen' })).toBeVisible();
   await page.getByTestId('continue-to-close').click();
   await page.getByRole('radio', { name: 'Keine neuen Mängel festgestellt' }).click();
   await sign(page);

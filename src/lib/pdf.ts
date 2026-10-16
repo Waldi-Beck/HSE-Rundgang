@@ -7,7 +7,7 @@ import { addDays, displayWalkNumber, durationMinutes, formatDate, formatDuration
 import { blobToDataUrl } from './image';
 import { priorityDays, suggestedResult, validDefectDue } from './register';
 import type { Defect, Photo, RegisterSettings, ResultKey, Walk } from './types';
-import { cellKey } from './walk';
+import { cellKey, defectItemLabel } from './walk';
 
 const MARGIN = 8;
 const INK: [number, number, number] = [38, 43, 47];
@@ -321,7 +321,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
         doc.setFontSize(5.8);
         doc.setTextColor(...MUTED);
         doc.text(`Mangel-ID: ${defect.mangelId}`, cell.cell.x + 1.5, cell.cell.y + 8);
-        doc.text(`Pkt.: ${defect.itemId}`, cell.cell.x + 1.5, cell.cell.y + 12);
+        doc.text(`Pkt.: ${defectItemLabel(defect.itemId)}`, cell.cell.x + 1.5, cell.cell.y + 12);
         const area = areaLabel(defect.area, settings.areas);
         doc.text(doc.splitTextToSize(`Bereich: ${area}`, cell.cell.width - 3), cell.cell.x + 1.5, cell.cell.y + 16);
       }
@@ -374,7 +374,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     const effectiveDue = validDefectDue(sourceDate, defect, settings);
     const originalDue = defect.due || addDays(sourceDate, priorityDays(settings, defect.priority));
     const overdue = effectiveDue < toISODate(new Date());
-    return [source ? displayWalkNumber(source.date) : 'nicht hinterlegt', `M${String(defect.nr).padStart(2, '0')}`, defect.itemId || '–', areaLabel(defect.area, settings.areas), safePdfDescription(defect.description), DEFECT_STATUS_LABELS[defect.status] ?? 'Status nicht hinterlegt', formatDate(originalDue), overdue ? 'ÜBERFÄLLIG' : 'fristgerecht'];
+    return [source ? displayWalkNumber(source.date) : 'nicht hinterlegt', `M${String(defect.nr).padStart(2, '0')}`, defectItemLabel(defect.itemId) || '–', areaLabel(defect.area, settings.areas), safePdfDescription(defect.description), DEFECT_STATUS_LABELS[defect.status] ?? 'Status nicht hinterlegt', formatDate(originalDue), overdue ? 'ÜBERFÄLLIG' : 'fristgerecht'];
   }) : [[{ content: 'Keine offenen Massnahmen aus vorherigen Rundgängen.', colSpan: 8, styles: { textColor: MUTED } }]];
   autoTable(doc, {
     ...common,

@@ -125,7 +125,7 @@ export function ChecklistTab({ walk, defects, onNewDefect, onEditDefect }: {
       </section>
     </> : <MonthlyChecklist walk={walk} defects={defects} readOnly={readOnly} onRate={rateMonthly} onEditDefect={onEditDefect} restOk={restOkMonthly} />}
 
-    <Link to={`/rundgang/${walk.id}/abschluss`} replace className="btn-primary w-full" data-testid="continue-to-close">Weiter zum Abschluss</Link>
+    <Link to={`/rundgang/${walk.id}/maengel`} replace className="btn-primary w-full" data-testid="continue-to-defects">Weiter zu Mängeln</Link>
   </div>;
 }
 

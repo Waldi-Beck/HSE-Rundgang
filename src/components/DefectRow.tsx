@@ -6,6 +6,7 @@ import { updateDefect } from '../db';
 import { displayWalkNumber, formatDate } from '../lib/dates';
 import { defectDaysOpen, validDefectDue } from '../lib/register';
 import type { Defect, DefectStatus, Walk } from '../lib/types';
+import { defectItemLabel } from '../lib/walk';
 import { useRegisterSettings } from './SettingsContext';
 import { Badge, Field } from './ui';
 
@@ -52,7 +53,7 @@ export function DefectRow({
     <li className="px-4 py-3.5" data-testid={`defect-${defect.nr}`}>
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
         <span className="font-semibold tabular-nums">{defect.mangelId}</span>
-        <span className="text-muted">Nr. {defect.nr} · {defect.itemId}</span>
+        <span className="text-muted">Nr. {defect.nr} · {defectItemLabel(defect.itemId)}</span>
         {showOrigin && walk && <span className="text-muted">{displayWalkNumber(walk.date)}</span>}
         <span className="ml-auto flex items-center gap-1.5">
           <Badge tone={defect.priority === 'K' ? 'danger' : 'neutral'}>{PRIORITY_KEY_TO_TEXT[defect.priority]}</Badge>
@@ -60,7 +61,7 @@ export function DefectRow({
         </span>
       </div>
       <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted">
-        <span>{formatDate(walkDate)}</span><span>{areaLabel(defect.area, settings.areas)}</span><span>{defect.itemId}</span>
+        <span>{formatDate(walkDate)}</span><span>{areaLabel(defect.area, settings.areas)}</span><span>{defectItemLabel(defect.itemId)}</span>
         <span className={overdue ? 'font-semibold text-danger' : ''}>Gültige Frist {formatDate(validDue)}</span><span>{daysOpen} Tage offen</span>
         {photoCount ? <span className="inline-flex items-center gap-1"><ImageSquare size={14} aria-hidden />{photoCount}</span> : null}
       </div>

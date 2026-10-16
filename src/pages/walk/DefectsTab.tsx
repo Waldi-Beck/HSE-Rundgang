@@ -39,7 +39,7 @@ export function DefectsTab({
       </div>
       {defects.length === 0 ? (
         <EmptyState title="Keine Mängel erfasst">
-          Einen Punkt in der Checkliste auf „Mangel“ setzen, dann öffnet sich die Mängelerfassung mit Punkt und Bereich.
+          Mängel aus der Checkliste werden hier übernommen. Mit „Mangel“ kannst du auch eine sonstige Auffälligkeit erfassen, die nicht in der Checkliste steht.
         </EmptyState>
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">

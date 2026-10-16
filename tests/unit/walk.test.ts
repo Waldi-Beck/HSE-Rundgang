@@ -49,6 +49,22 @@ describe('New checklist and closure', () => {
     const monthlyAreas = Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`M${i + 1}`, FORM_AREAS[0].id]));
     expect(validateForClose(makeWalk({ monthlyChecked: true, ratings: all, monthlyAreas, result: 'none' }), [])).toEqual([]);
   });
+
+  it('allows a defect recorded as outside the checklist when it has an area and required details', () => {
+    const other = makeDefect({ itemId: 'SONSTIGES', area: 'qps' });
+    const ratings = Object.fromEntries(requiredRatingKeys(false).map((key) => [key, 'ok' as const]));
+    expect(defectAreaValid(other)).toBe(true);
+    expect(validateForClose(makeWalk({ ratings, result: 'none' }), [other])).toEqual([]);
+    expect(defectAreaValid({ ...other, area: 'unknown-area' })).toBe(false);
+  });
+
+  it('accepts one of the three fixed areas for monthly checklist defects', () => {
+    const ratings = Object.fromEntries(requiredRatingKeys(true).map((key) => [key, key === 'M1' ? 'mangel' as const : 'ok' as const]));
+    const monthlyWalk = makeWalk({ monthlyChecked: true, ratings, monthlyAreas: { M1: 'QLabs' }, result: 'none' });
+    const monthlyDefect = makeDefect({ itemId: 'M1', area: 'qlabs' });
+    expect(defectAreaValid(monthlyDefect)).toBe(true);
+    expect(mangelWithoutDefect(monthlyWalk, [monthlyDefect])).toEqual([]);
+  });
 });
 
 describe('Workbook deadline and inspection calculations', () => {
