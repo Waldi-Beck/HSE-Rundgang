@@ -1,5 +1,13 @@
 # Changelog
 
+## Unveröffentlicht: Optionale KI-Fotoanalyse
+
+- Separate Cloudflare Worker-Architektur mit Anthropic-Schlüssel ausschliesslich serverseitig, Zugangscode, strengem CORS, JPEG-/Anfragelimit und Durable-Object-Tageslimit.
+- KI ist standardmässig aus und erfordert eine datierte Datenschutzbestätigung. Fotoanalyse sendet verkleinerte Einzelbilder nur auf ausdrückliche Aktion.
+- Strukturierte Claude-Vorschläge mit STOP-Massnahmen, Zod-Prüfung, feldweiser/gesamter menschlicher Übernahme und unveränderlicher Prüfspur pro Mangel.
+- Prüfvermerk im PDF sowie KI-Unterstützungsspalte im Mängelregister und XLSX; lokale Zugangscodes werden nie exportiert.
+- Offline- und manuelle Erfassung bleiben ohne KI-Worker unverändert möglich.
+
 ## 2026-10-10: Checklistenmatrix gemäss Referenz
 
 - Kapitel 2.1 als gemeinsame Tabelle mit den Spalten QPS, QLabs und xTec; 15 Prüfpunkte je Bereich (45 Bewertungen).

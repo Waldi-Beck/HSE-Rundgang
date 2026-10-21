@@ -324,6 +324,12 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
         doc.text(`Pkt.: ${defectItemLabel(defect.itemId)}`, cell.cell.x + 1.5, cell.cell.y + 12);
         const area = areaLabel(defect.area, settings.areas);
         doc.text(doc.splitTextToSize(`Bereich: ${area}`, cell.cell.width - 3), cell.cell.x + 1.5, cell.cell.y + 16);
+        if (defect.aiAudit?.used) {
+          const reviewer = defect.aiAudit.reviewedBy || walk.inspector || 'nicht angegeben';
+          doc.setFontSize(5.2);
+          doc.setTextColor(...MUTED);
+          doc.text(doc.splitTextToSize(`Mit KI-Unterstützung erstellt, durch ${reviewer} geprüft`, cell.cell.width - 3), cell.cell.x + 1.5, cell.cell.y + 21);
+        }
       }
       if (cell.column.index === 4) {
         const firstPhoto = photosFor(defect.id)[0];

@@ -30,6 +30,8 @@ export async function buildBackup(
   inspections: Inspection[],
   settings: RegisterSettings,
 ): Promise<BackupFile> {
+  const portableSettings = { ...settings };
+  delete portableSettings.aiAccessCode;
   return {
     format: BACKUP_FORMAT,
     formatVersion: BACKUP_VERSION,
@@ -39,7 +41,7 @@ export async function buildBackup(
     defects,
     photos: await Promise.all(photos.map(async ({ blob, ...rest }) => ({ ...rest, dataUrl: await blobToDataUrl(blob) }))),
     inspections,
-    settings,
+    settings: portableSettings,
   };
 }
 

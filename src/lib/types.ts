@@ -39,6 +39,40 @@ export interface Walk {
 
 export type DefectStatus = 'open' | 'inProgress' | 'done' | 'recheck';
 
+export type AiAcceptedField = 'hazard' | 'priority' | 'immediateAction' | 'action' | 'itemId';
+
+export interface AiHazardProposal {
+  beschreibung: string;
+  folge: string;
+}
+
+export interface AiMeasureProposal {
+  text: string;
+  stopStufe: 'Substitution' | 'Technisch' | 'Organisatorisch' | 'Persönlich';
+}
+
+export interface AiProposal {
+  mangelErkannt: boolean;
+  gefahren: AiHazardProposal[];
+  vorgeschlagenePrio: PriorityKey | null;
+  begruendungPrio: string;
+  sofortmassnahme: string;
+  massnahmen: AiMeasureProposal[];
+  passendeGrundlage: string;
+  passenderKontrollpunkt: string | null;
+  sicherheit: 'hoch' | 'mittel' | 'niedrig';
+  hinweis: string;
+}
+
+export interface AiAudit {
+  used: boolean;
+  analyzedAt: string | null;
+  model: string;
+  proposal: AiProposal | null;
+  acceptedFields: AiAcceptedField[];
+  reviewedBy: string;
+}
+
 export interface Defect {
   id: string;
   walkId: string;
@@ -60,6 +94,7 @@ export interface Defect {
   fixed: boolean | null;
   newDue: string;
   note: string;
+  aiAudit?: AiAudit | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -91,6 +126,10 @@ export interface RegisterSettings {
   areas: string[];
   priorityDays: Record<PriorityKey, number>;
   maxIntervalDays: number;
+  aiEnabled?: boolean;
+  aiServerUrl?: string;
+  aiAccessCode?: string;
+  aiConsentAt?: string | null;
   updatedAt?: string;
 }
 

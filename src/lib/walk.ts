@@ -67,7 +67,7 @@ export function defectsForCell<T extends Pick<Defect, 'itemId' | 'area'>>(key: s
 export function mangelWithoutDefect(walk: Pick<Walk, 'ratings' | 'monthlyChecked' | 'monthlyAreas'>, defects: Pick<Defect, 'itemId' | 'area'>[]): string[] {
   return requiredRatingKeys(walk.monthlyChecked).flatMap((key) => {
     if (walk.ratings[key] !== 'mangel') return [];
-    if (isMonthlyItem(key)) return defects.some((defect) => defect.itemId === key) ? [] : [key];
+    if (isMonthlyItem(key)) return defects.some((defect) => defect.itemId === key || (isOtherFinding(defect.itemId) && defect.area === walk.monthlyAreas[key])) ? [] : [key];
     return defectsForCell(key, defects).length ? [] : [key];
   });
 }

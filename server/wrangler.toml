@@ -1,0 +1,16 @@
+name = "hse-rundgang-ai"
+main = "src/index.ts"
+compatibility_date = "2026-10-21"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:4173,https://waldi-beck.github.io"
+MAX_REQUESTS_PER_DAY = "30"
+
+[[durable_objects.bindings]]
+name = "USAGE"
+class_name = "DailyUsage"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DailyUsage"]

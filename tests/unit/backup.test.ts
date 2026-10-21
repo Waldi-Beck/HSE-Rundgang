@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BACKUP_FORMAT, BACKUP_VERSION, parseBackup } from '../../src/lib/backup';
 import type { Walk } from '../../src/lib/types';
+import { buildBackup } from '../../src/lib/backup';
+import { DEFAULT_REGISTER_SETTINGS } from '../../src/data/register';
 
 const walk: Walk = {
   id: 'walk-1', docNr: 'HSE-RG-2026-001', date: '2026-10-08', isoYear: 2026, week: 41,
@@ -37,5 +39,12 @@ describe('JSON backup format v4', () => {
   });
   it('rejects walks without a valid immutable round number', () => {
     expect(() => parseBackup(backup({ walks: [{ ...walk, docNr: 'QPS_HSE_00064' }] }))).toThrow(/ungültige Rundgangnummer/);
+  });
+
+  it('never includes the device-local AI access code in portable backups', async () => {
+    const exported = await buildBackup([], [], [], [], { ...DEFAULT_REGISTER_SETTINGS, aiEnabled: true, aiServerUrl: 'https://worker.example', aiAccessCode: 'do-not-export-this', aiConsentAt: '2026-10-21T12:00:00Z' });
+    expect(exported.settings).toMatchObject({ aiEnabled: true, aiServerUrl: 'https://worker.example', aiConsentAt: '2026-10-21T12:00:00Z' });
+    expect(exported.settings).not.toHaveProperty('aiAccessCode');
+    expect(JSON.stringify(exported)).not.toContain('do-not-export-this');
   });
 });

@@ -89,6 +89,18 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
     expect(output.match(/Beschreibung nicht hinterlegt/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('prints the AI assistance and human-review audit marker for supported defects only', async () => {
+    const pdf = await buildReportPdf({
+      walk,
+      defects: [makeDefect({ aiAudit: { used: true, analyzedAt: '2026-10-06T10:00:00Z', model: 'claude-test', proposal: null, acceptedFields: ['hazard'], reviewedBy: 'Max Muster' } })],
+      photos: [], openFromPrevious: [], fileBaseName: 'ai-audit-test',
+      settings: { id: 'app', areas: ['QLabs'], priorityDays: { K: 0, H: 2, M: 7, N: 30 }, maxIntervalDays: 14 },
+    });
+    const output = pdf.output();
+    expect(output).toContain('Mit KI-Unterst');
+    expect(pdf.output()).toContain('Max Muster');
+  });
+
   it('druckt QPS-Logo und unveränderte SOP-Dokumenten-ID auf mindestens drei Seiten', async () => {
     const api = jsPDF.API as unknown as { addImage: (...args: unknown[]) => unknown };
     const addImage = vi.spyOn(api, 'addImage');

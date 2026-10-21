@@ -41,6 +41,10 @@ export const DEFAULT_REGISTER_SETTINGS = {
   areas: [...REGISTER_AREA_DEFAULTS],
   priorityDays: { K: 0, H: 2, M: 7, N: 30 },
   maxIntervalDays: 14,
+  aiEnabled: false,
+  aiServerUrl: '',
+  aiAccessCode: '',
+  aiConsentAt: null,
 };
 
 /** Retained for backwards-compatible storage and existing local backups. */

@@ -60,10 +60,12 @@ describe('New checklist and closure', () => {
 
   it('accepts one of the three fixed areas for monthly checklist defects', () => {
     const ratings = Object.fromEntries(requiredRatingKeys(true).map((key) => [key, key === 'M1' ? 'mangel' as const : 'ok' as const]));
-    const monthlyWalk = makeWalk({ monthlyChecked: true, ratings, monthlyAreas: { M1: 'QLabs' }, result: 'none' });
+    const monthlyWalk = makeWalk({ monthlyChecked: true, ratings, monthlyAreas: { M1: 'qlabs' }, result: 'none' });
     const monthlyDefect = makeDefect({ itemId: 'M1', area: 'qlabs' });
     expect(defectAreaValid(monthlyDefect)).toBe(true);
     expect(mangelWithoutDefect(monthlyWalk, [monthlyDefect])).toEqual([]);
+    const outsideListDefect = makeDefect({ itemId: 'SONSTIGES', area: 'qlabs' });
+    expect(mangelWithoutDefect(monthlyWalk, [outsideListDefect])).toEqual([]);
   });
 });
 

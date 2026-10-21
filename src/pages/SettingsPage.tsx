@@ -12,6 +12,7 @@ export function SettingsPage() {
   const current = useRegisterSettings();
   const toast = useToast();
   const [draft, setDraft] = useState<RegisterSettings>(current);
+  const [showAiConsent, setShowAiConsent] = useState(false);
   useEffect(() => setDraft(current), [current]);
 
   const setArea = (index: number, value: string) => setDraft((settings) => ({ ...settings, areas: settings.areas.map((area, i) => i === index ? value : area) }));
@@ -23,6 +24,19 @@ export function SettingsPage() {
     }
     await saveSettings({ ...draft, areas });
     toast('Einstellungen gespeichert.');
+  };
+
+  const setAiEnabled = (enabled: boolean) => {
+    if (enabled && !draft.aiConsentAt) {
+      setShowAiConsent(true);
+      return;
+    }
+    setDraft((settings) => ({ ...settings, aiEnabled: enabled }));
+  };
+
+  const acceptAiConsent = () => {
+    setDraft((settings) => ({ ...settings, aiEnabled: true, aiConsentAt: new Date().toISOString() }));
+    setShowAiConsent(false);
   };
 
   return (
@@ -48,6 +62,30 @@ export function SettingsPage() {
       <section className="rounded-xl border border-line bg-surface p-4">
         <Field label="Höchstintervall zwischen Rundgängen (Tage)" htmlFor="setting-max-interval" hint="Startwert aus Excel-Listen!M2: 14 Tage."><input id="setting-max-interval" className="field" type="number" min={1} max={90} value={draft.maxIntervalDays} onChange={(event) => setDraft((settings) => ({ ...settings, maxIntervalDays: Number(event.target.value) }))} /></Field>
       </section>
+
+      <section className="space-y-4 rounded-xl border border-line bg-surface p-4" data-testid="ai-settings">
+        <div><h2 className="text-lg font-semibold">Optionale KI-Fotoanalyse</h2><p className="text-sm text-muted">Standardmässig ausgeschaltet. Die manuelle Mängelerfassung funktioniert immer, auch offline.</p></div>
+        <label className="flex min-h-12 items-center gap-3 font-medium">
+          <input type="checkbox" className="h-5 w-5 accent-[var(--accent)]" checked={(draft.aiEnabled ?? false) || showAiConsent} onChange={(event) => setAiEnabled(event.target.checked)} data-testid="ai-enabled" />
+          KI-Vorschläge im Mängel-Formular aktivieren
+        </label>
+        <Field label="KI-Server-Adresse" htmlFor="ai-server-url" hint="HTTPS-URL deines Cloudflare Workers, ohne /v1/analyze.">
+          <input id="ai-server-url" className="field" type="url" autoComplete="url" value={draft.aiServerUrl ?? ''} onChange={(event) => setDraft((settings) => ({ ...settings, aiServerUrl: event.target.value }))} placeholder="https://hse-rundgang-ai.example.workers.dev" />
+        </Field>
+        <Field label="KI-Zugangscode" htmlFor="ai-access-code" hint="Wird nur auf diesem Gerät gespeichert und nie in die Datensicherung exportiert.">
+          <input id="ai-access-code" className="field" type="password" autoComplete="new-password" value={draft.aiAccessCode ?? ''} onChange={(event) => setDraft((settings) => ({ ...settings, aiAccessCode: event.target.value }))} />
+        </Field>
+        {draft.aiConsentAt && <p className="text-xs text-muted">Datenschutzhinweis bestätigt am {new Date(draft.aiConsentAt).toLocaleString('de-CH')}.</p>}
+      </section>
+
+      {showAiConsent && <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" role="presentation">
+        <section role="dialog" aria-modal="true" aria-labelledby="ai-consent-title" className="max-h-[90dvh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl border border-line bg-surface p-5 shadow-xl">
+          <h2 id="ai-consent-title" className="text-lg font-semibold">Datenschutz bei der KI-Fotoanalyse</h2>
+          <p className="text-sm leading-relaxed">Wenn du ein Foto analysieren lässt, werden das ausgewählte Foto und der nötige Mängelkontext an deinen KI-Server und von dort an Anthropic in den USA übertragen. Dieser Worker speichert das Foto nicht. Anthropic verarbeitet API-Eingaben gemäss den jeweils geltenden Vertrags- und Aufbewahrungsbedingungen; API-Eingaben werden laut Anthropic standardmässig nicht zum Modelltraining verwendet. Prüfe die aktuellen <a className="font-semibold text-accent underline" href="https://www.anthropic.com/legal/commercial-terms" target="_blank" rel="noreferrer">Anthropic Commercial Terms</a> und die <a className="font-semibold text-accent underline" href="https://privacy.anthropic.com/" target="_blank" rel="noreferrer">Datenschutzinformationen</a>.</p>
+          <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm">Sende keine Fotos mit erkennbaren Personen oder vertraulichen Unterlagen. KI-Ergebnisse sind nur Vorschläge und müssen von dir geprüft werden.</p>
+          <div className="flex gap-2"><button type="button" className="btn-secondary flex-1" onClick={() => setShowAiConsent(false)}>Abbrechen</button><button type="button" className="btn-primary flex-1" data-testid="accept-ai-consent" onClick={acceptAiConsent}>Verstanden, KI aktivieren</button></div>
+        </section>
+      </div>}
       <button type="button" className="btn-primary w-full" onClick={() => void save()}>Einstellungen speichern</button>
     </div>
   );

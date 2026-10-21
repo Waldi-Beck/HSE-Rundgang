@@ -5,6 +5,38 @@ import path from 'node:path';
 const shots = path.resolve('docs/screenshots');
 const fixture = path.resolve('tests/fixtures/mangel-fluchtweg.jpg');
 const ROOMS = ['qps', 'qlabs', 'xtec'];
+const AI_PROPOSAL = {
+  mangelErkannt: true,
+  gefahren: [{ beschreibung: 'Fluchtweg ist durch Material blockiert.', folge: 'Evakuierung kann verzögert werden.' }],
+  vorgeschlagenePrio: 'H', begruendungPrio: 'Ein Fluchtweg ist eingeschränkt; zeitnahe Behebung empfohlen.',
+  sofortmassnahme: 'Material sofort entfernen und Fluchtweg freihalten.',
+  massnahmen: [{ text: 'Bodenfläche vor dem Fluchtweg markieren.', stopStufe: 'Organisatorisch' }],
+  passendeGrundlage: 'ArGV 4 Art. 8 (Fluchtwege)', passenderKontrollpunkt: 'R1', sicherheit: 'hoch',
+  hinweis: 'Vorschlag anhand des Fotos. Vor Ort fachlich prüfen.',
+};
+
+async function enableAiWithMockedWorker(page: import('@playwright/test').Page, onAnalyze?: (body: Record<string, unknown>) => void) {
+  await page.route('http://localhost:8787/v1/analyze', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: { 'access-control-allow-origin': 'http://localhost:4173', 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'content-type, x-access-code' } });
+      return;
+    }
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    onAnalyze?.(body);
+    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': 'http://localhost:4173', 'access-control-allow-headers': 'content-type, x-access-code' }, body: JSON.stringify({ proposal: AI_PROPOSAL, model: 'claude-mock-test' }) });
+  });
+  await page.getByRole('link', { name: 'Einstellungen' }).click();
+  await expect(page.getByTestId('ai-enabled')).not.toBeChecked();
+  await page.getByLabel('KI-Server-Adresse').fill('http://localhost:8787');
+  await page.getByLabel('KI-Zugangscode').fill('playwright-local-code');
+  await page.getByTestId('ai-enabled').check();
+  await expect(page.getByRole('dialog', { name: 'Datenschutz bei der KI-Fotoanalyse' })).toBeVisible();
+  await page.getByTestId('accept-ai-consent').click();
+  await page.getByRole('button', { name: 'Einstellungen speichern' }).click();
+  await expect(page.getByText('Einstellungen gespeichert.')).toBeVisible();
+  await page.getByRole('link', { name: 'Zurück zum Register' }).click();
+  await page.getByRole('link', { name: 'Übersicht', exact: true }).click();
+}
 
 async function restOkEverywhere(page: import('@playwright/test').Page) {
   for (const room of ROOMS) {
@@ -39,6 +71,8 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   page.on('pageerror', (error) => errors.push(error.message));
 
   await page.goto('/');
+  let analysisRequest: Record<string, unknown> | undefined;
+  await enableAiWithMockedWorker(page, (body) => { analysisRequest = body; });
   await expect(page.getByRole('heading', { name: 'Übersicht' })).toBeVisible();
   await expect(page.getByText('QPS_HSE_00064')).toBeVisible();
   await expect(page.getByText('Gültig ab 05.10.2026')).toBeVisible();
@@ -84,6 +118,16 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await sheet.getByTestId('prio-H').click();
   await sheet.getByTestId('photo-camera').setInputFiles(fixture);
   await expect(sheet.getByTestId('photo-list').locator('img')).toHaveCount(1);
+  await sheet.getByTestId('analyze-photo').click();
+  await expect(sheet.getByTestId('ai-proposal')).toBeVisible();
+  expect(analysisRequest?.context).toMatchObject({ area: 'QLabs', itemId: 'R4', basis: expect.any(String) });
+  expect(JSON.stringify(analysisRequest)).not.toContain('ANTHROPIC_API_KEY');
+  await sheet.getByTestId('accept-all-ai').click();
+  await expect(sheet.getByLabel('Festgestellte Gefahr')).toHaveValue(/Fluchtweg ist durch Material blockiert/);
+  await expect(sheet.getByRole('radio', { name: /Hoch/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(sheet.getByRole('textbox', { name: 'Sofortmassnahme' })).toHaveValue('Material sofort entfernen und Fluchtweg freihalten.');
+  await expect(sheet.getByLabel('Massnahme', { exact: true })).toHaveValue(/Organisatorisch/);
+  await expect(sheet.getByText(/Vorgeschlagener Kontrollpunkt: R1/)).toBeVisible();
   await sheet.screenshot({ path: `${shots}/02-mangel-mit-foto.png` });
   await sheet.getByTestId('defect-save').click();
   await expect(sheet).toHaveCount(0);
@@ -123,8 +167,7 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
     await monthlyArea.selectOption({ value: area });
     await expect(monthlyArea).toHaveValue(area);
   }
-  const monthlyRest = page.getByTestId('rest-ok');
-  if (await monthlyRest.count()) await monthlyRest.click();
+  await page.getByTestId('rest-ok').click();
   await page.getByTestId('area-tab-weekly').click();
   await page.getByTestId('next-department').click();
   await expect(page.getByRole('heading', { name: '3. Abschluss' })).toBeVisible();
@@ -145,6 +188,7 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await pdf.saveAs(pdfPath);
   expect(readFileSync(pdfPath).subarray(0, 5).toString()).toBe('%PDF-');
   expect(statSync(pdfPath).size).toBeGreaterThan(30_000);
+  expect(readFileSync(pdfPath, 'latin1')).toContain('Mit KI-Unterst');
 
   await page.getByRole('link', { name: 'Register', exact: true }).click();
   await page.getByRole('tab', { name: 'Rundgänge' }).click();
@@ -190,4 +234,27 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   expect(readFileSync(secondPdfPath).subarray(0, 5).toString()).toBe('%PDF-');
   expect(statSync(secondPdfPath).size).toBeGreaterThan(30_000);
   expect(errors).toEqual([]);
+});
+
+test('offline bleibt die manuelle Mängelerfassung nutzbar und KI zeigt einen verständlichen Hinweis', async ({ page }) => {
+  await page.goto('/');
+  await enableAiWithMockedWorker(page);
+  await page.getByTestId('new-walk').click();
+  await page.getByTestId('to-checklist').click();
+  await page.getByTestId('select-area-qps').click();
+  await page.getByTestId('rate-R1@qps-mangel').click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByTestId('photo-camera').setInputFiles(fixture);
+  await page.context().setOffline(true);
+  await expect(sheet.getByTestId('analyze-photo')).toHaveCount(0);
+  await expect(sheet.getByText(/Offline: KI-Analyse nicht verfügbar/)).toBeVisible();
+  await sheet.getByLabel('Beschreibung des Mangels').fill('Manuell erfasster Mangel ohne Verbindung');
+  await sheet.getByLabel('Festgestellte Gefahr').fill('Manuelle Gefahrenbeurteilung');
+  await sheet.getByTestId('defect-save').click();
+  await expect(sheet).toHaveCount(0);
+  await page.getByRole('link', { name: 'Einstellungen' }).click();
+  await page.getByTestId('ai-enabled').uncheck();
+  await page.getByRole('button', { name: 'Einstellungen speichern' }).click();
+  await expect(page.getByText('Mangel speichern')).toHaveCount(0);
+  await page.context().setOffline(false);
 });

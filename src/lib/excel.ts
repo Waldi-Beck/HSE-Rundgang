@@ -97,8 +97,8 @@ export async function buildRegisterWorkbook(input: RegisterWorkbookInput): Promi
   const walkById = new Map(walks.map((walk) => [walk.id, walk]));
   const defectSheet = workbook.addWorksheet('Mängel');
   setSheetHeader(defectSheet, [
-    'Mangel-ID', 'Datum', 'KW', 'Nr. im Formular', 'Bereich', 'Kontrollpunkt', 'Beschreibung des Mangels', 'Festgestellte Gefahr', 'Priorität', 'Sofortmassnahme', 'Massnahme', 'Verantwortlich', 'Frist', 'Status', 'Erledigt am', 'Nachkontrolle am', 'Kontrolliert von', 'Mangel behoben?', 'Neuer Termin (bei Nein)', 'Gültige Frist', 'Tage offen', 'Überfällig', 'Bemerkung', 'Rundgang-Nr.',
-  ], [22, 13, 12, 14, 22, 14, 42, 38, 20, 34, 34, 24, 13, 30, 13, 16, 24, 15, 18, 14, 12, 16, 34, 24]);
+    'Mangel-ID', 'Datum', 'KW', 'Nr. im Formular', 'Bereich', 'Kontrollpunkt', 'Beschreibung des Mangels', 'Festgestellte Gefahr', 'Priorität', 'KI-Unterstützung', 'Sofortmassnahme', 'Massnahme', 'Verantwortlich', 'Frist', 'Status', 'Erledigt am', 'Nachkontrolle am', 'Kontrolliert von', 'Mangel behoben?', 'Neuer Termin (bei Nein)', 'Gültige Frist', 'Tage offen', 'Überfällig', 'Bemerkung', 'Rundgang-Nr.',
+  ], [22, 13, 12, 14, 22, 14, 42, 38, 20, 42, 34, 34, 24, 13, 30, 13, 16, 24, 15, 18, 14, 12, 16, 34, 24]);
   for (const defect of defects) {
     const walk = walkById.get(defect.walkId);
     const walkDate = walk?.date ?? defect.createdAt.slice(0, 10);
@@ -115,6 +115,7 @@ export async function buildRegisterWorkbook(input: RegisterWorkbookInput): Promi
       defect.description,
       defect.hazard,
       PRIORITY_KEY_TO_TEXT[defect.priority],
+      defect.aiAudit?.used ? `Ja — durch ${defect.aiAudit.reviewedBy || walk?.inspector || 'nicht angegeben'} geprüft` : 'Nein',
       defect.immediateAction,
       defect.action,
       defect.responsible,
@@ -132,7 +133,7 @@ export async function buildRegisterWorkbook(input: RegisterWorkbookInput): Promi
       walk ? displayWalkNumber(walk.date) : '',
     ]);
     styleDataRow(row);
-    for (const column of [2, 13, 15, 16, 19, 20]) row.getCell(column).numFmt = 'dd.mm.yyyy';
+    for (const column of [2, 14, 16, 17, 20, 21]) row.getCell(column).numFmt = 'dd.mm.yyyy';
     if (overdue) row.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4E4' } }; });
     if (defect.priority === 'K') row.getCell(9).font = { bold: true, color: { argb: 'FFC00000' } };
   }

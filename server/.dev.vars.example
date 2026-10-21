@@ -1,0 +1,6 @@
+# Copy to .dev.vars locally. Never commit real values.
+ANTHROPIC_API_KEY=replace-with-your-anthropic-api-key
+CLAUDE_MODEL=replace-with-supported-claude-model-id
+ACCESS_CODE=replace-with-long-random-organisation-access-code
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:4173,https://waldi-beck.github.io
+MAX_REQUESTS_PER_DAY=30

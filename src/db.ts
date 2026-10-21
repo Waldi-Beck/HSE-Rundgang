@@ -115,6 +115,28 @@ db.version(5)
     await tx.table('defects').bulkPut(defects.map((defect) => ({ ...defect, area: legacyTargets[defect.area] ?? defect.area })));
   });
 
+db.version(6)
+  .stores({
+    walks: 'id, date, status, &docNr',
+    defects: 'id, walkId, status, itemId, area, mangelId',
+    photos: 'id, defectId',
+    counters: '&year',
+    inspections: 'id, area',
+    settings: '&id',
+  })
+  .upgrade(async (tx) => {
+    const saved = await tx.table('settings').get('app') as RegisterSettings | undefined;
+    await tx.table('settings').put({
+      ...(saved ?? DEFAULT_REGISTER_SETTINGS),
+      aiEnabled: false,
+      aiServerUrl: '',
+      aiAccessCode: '',
+      aiConsentAt: null,
+    });
+    const defects = await tx.table('defects').toArray() as Defect[];
+    await tx.table('defects').bulkPut(defects.map((defect) => ({ ...defect, aiAudit: defect.aiAudit ?? null })));
+  });
+
 export const uid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
 const emptySignature = () => ({ name: '', date: '', image: '' });
@@ -343,7 +365,7 @@ export async function importBackupData(
     if (defects.length) await db.defects.bulkPut(defects);
     if (photos.length) await db.photos.bulkPut(photos);
     if (incomingInspections.length) await db.inspections.bulkPut(incomingInspections);
-    if (incomingSettings) await db.settings.put({ ...incomingSettings, id: 'app' });
+    if (incomingSettings) await db.settings.put({ ...incomingSettings, aiAccessCode: '', id: 'app' });
     return { walks: accepted.size, defects: defects.length, photos: photos.length, inspections: incomingInspections.length, collisions };
   });
 }
