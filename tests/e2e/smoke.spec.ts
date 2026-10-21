@@ -71,6 +71,9 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
 
   const sheet = page.getByRole('dialog');
   await expect(sheet.getByRole('heading', { name: /Mangel 2026-\d{2}-\d{2}-M01/ })).toBeVisible();
+  await expect(sheet.getByTestId('photo-camera')).toHaveAttribute('capture', 'environment');
+  await expect(sheet.getByTestId('photo-camera')).not.toHaveAttribute('multiple', '');
+  await expect(sheet.getByTestId('photo-gallery')).toHaveAttribute('multiple', '');
   await expect(sheet.getByLabel('Kontrollpunkt')).toHaveCount(0);
   await expect(sheet.getByLabel('Bereich')).toHaveValue('qlabs');
   await sheet.getByLabel('Beschreibung des Mangels').fill('Feuerlöscher hinter Material abgestellt');

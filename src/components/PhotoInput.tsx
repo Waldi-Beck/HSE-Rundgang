@@ -76,7 +76,6 @@ export function PhotoInput({
               type="file"
               accept="image/*"
               capture="environment"
-              multiple
               className="sr-only"
               data-testid="photo-camera"
               onChange={(e) => {
