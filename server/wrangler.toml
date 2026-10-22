@@ -4,8 +4,9 @@ compatibility_date = "2026-10-21"
 workers_dev = true
 
 [vars]
-ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:4173,https://waldi-beck.github.io"
+ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:4173,http://localhost:5176,https://waldi-beck.github.io"
 MAX_REQUESTS_PER_DAY = "30"
+CLAUDE_MODEL = "claude-sonnet-5-5"
 
 [[durable_objects.bindings]]
 name = "USAGE"

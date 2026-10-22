@@ -39,6 +39,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   RATE_LIMIT_UNAVAILABLE: 'Das KI-Limit ist momentan nicht verfügbar. Bitte später erneut versuchen.',
   ANALYSIS_INVALID: 'Die KI-Antwort war unvollständig. Bitte manuell weiterarbeiten.',
   PROVIDER_UNAVAILABLE: 'Der KI-Dienst ist vorübergehend nicht erreichbar. Bitte später erneut versuchen.',
+  TIMEOUT: 'Die Fotoanalyse dauert zu lange. Bitte später erneut versuchen oder den Mangel manuell erfassen.',
 };
 
 export async function analyzeDefectPhoto(photo: Blob, context: AiAnalysisContext, config: AiAnalysisConfig, signal?: AbortSignal): Promise<{ proposal: AiProposal; model: string }> {
@@ -56,16 +57,25 @@ export async function analyzeDefectPhoto(photo: Blob, context: AiAnalysisContext
 
   const imageJpegBase64 = await jpegBlobToBase64(photo);
   let response: Response;
+  const controller = new AbortController();
+  const relayAbort = () => controller.abort(signal?.reason);
+  if (signal?.aborted) relayAbort();
+  else signal?.addEventListener('abort', relayAbort, { once: true });
+  const timeout = setTimeout(() => controller.abort(new DOMException('Analyse timeout', 'TimeoutError')), 45_000);
   try {
     response = await fetch(`${server.toString().replace(/\/+$/, '')}/v1/analyze`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-access-code': config.accessCode },
       body: JSON.stringify({ imageJpegBase64, context }),
-      signal,
+      signal: controller.signal,
     });
   } catch (error) {
-    if ((error as Error).name === 'AbortError') throw error;
+    if ((error as Error).name === 'AbortError' && signal?.aborted) throw error;
+    if ((error as Error).name === 'AbortError' || (error as Error).name === 'TimeoutError') throw new AiAnalysisError(ERROR_MESSAGES.TIMEOUT, 'TIMEOUT');
     throw new AiAnalysisError('Der KI-Server ist nicht erreichbar. Prüfe die Verbindung; manuelle Eingabe funktioniert weiter.', 'UNREACHABLE');
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', relayAbort);
   }
 
   const body = await response.json().catch(() => null) as { proposal?: unknown; model?: unknown; error?: string } | null;

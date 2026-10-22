@@ -46,15 +46,7 @@
 
 ## Phase 6: Laien-Dokumentation und Freigabe
 
-- [x] T050 README: KI-Server Einrichtung (Wrangler lokal, Cloudflare Login/Secrets/Deploy, App URL/Code) und Anthropic Privacy links schreiben.
-- [x] T051 CHANGELOG ergänzen.
-- [x] T052 `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm run build`; Worker Tests separat ausführen.
-- [x] T053 `.dev.vars`/`.env`/API keys mittels git status und Secret-Pattern-Scan ausschliessen; Feature lokal committen und **nicht pushen**.
+ - [x] T053 `.dev.vars`/`.env`/API keys mittels git status und Secret-Pattern-Scan ausschliessen; Feature lokal committen und **nicht pushen**.
 
 ## Abhängigkeiten
-
-- T001-T006 vor Worker/App Umsetzung.
-- T010-T015 unabhängige Worker-Basis.
-- T020-T023 nötig vor UI/KI-Verknüpfung.
-- T030-T036 nach Protokoll + Einstellungen; danach T040-T042.
 - T050-T053 zuletzt.

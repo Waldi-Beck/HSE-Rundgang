@@ -13,6 +13,7 @@
 
 - `used: boolean` – wird nur bei tatsächlicher Fotoanfrage `true`.
 - `analyzedAt: string | null` – ISO-UTC Zeitpunkt.
+- `reviewedAt: string | null` – ISO-UTC Zeitpunkt der expliziten menschlichen Prüfbestätigung.
 - `model: string` – vom Worker zurückgegebene Modellkennung.
 - `proposal: AiProposal | null` – unveränderte, Zod-validierte Antwort.
 - `acceptedFields: AiAcceptedField[]` – nur aktiv übernommene Felder: `hazard`, `priority`, `immediateAction`, `action`, optional `itemId`/`area`.

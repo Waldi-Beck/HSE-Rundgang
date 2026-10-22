@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:worker",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "worker:typecheck": "npm --prefix server run typecheck",

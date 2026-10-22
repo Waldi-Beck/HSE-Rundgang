@@ -54,4 +54,17 @@ describe('optionaler KI-Client', () => {
     await expect(analyzeDefectPhoto(new Blob(['jpeg'], { type: 'image/jpeg' }), context, { ...config, consentAt: null })).rejects.toMatchObject({ code: 'CONSENT_REQUIRED' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('converts an internal network timeout into a clear German timeout error', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason ?? new DOMException('aborted', 'AbortError')), { once: true });
+    })));
+    const pending = analyzeDefectPhoto(new Blob(['jpeg'], { type: 'image/jpeg' }), context, config);
+    const expectation = expect(pending).rejects.toMatchObject({ code: 'TIMEOUT' });
+    await vi.advanceTimersByTimeAsync(45_001);
+    await expectation;
+    vi.useRealTimers();
+  });
 });

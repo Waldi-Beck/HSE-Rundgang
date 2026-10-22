@@ -30,7 +30,7 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
   const [aiAudit, setAiAudit] = useState<AiAudit>(() => defect.aiAudit ?? {
-    used: false, analyzedAt: null, model: '', proposal: null, acceptedFields: [], reviewedBy: '',
+    used: false, analyzedAt: null, reviewedAt: null, model: '', proposal: null, acceptedFields: [], reviewedBy: '',
   });
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
   const stored = useLiveQuery(() => db.photos.where('defectId').equals(defect.id).toArray(), [defect.id]);
@@ -41,6 +41,7 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
   ];
   const areaOptions = FORM_AREAS.map((area) => ({ id: area.id, label: area.label }));
   const missing = defectMissingFields(d);
+  const aiReviewMissing = aiAudit.used && !aiAudit.reviewedAt;
   const checklistItem = ALL_ITEMS.find((item) => item.id === d.itemId);
   const aiEnabled = settings.aiEnabled === true;
   const canOfferAi = !readOnly && aiEnabled && online && photos.length > 0 && !aiAudit.used;
@@ -91,7 +92,7 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
         accessCode: settings.aiAccessCode ?? '',
         consentAt: settings.aiConsentAt,
       });
-      setAiAudit({ used: true, analyzedAt: new Date().toISOString(), model: result.model, proposal: result.proposal, acceptedFields: [], reviewedBy: '' });
+      setAiAudit({ used: true, analyzedAt: new Date().toISOString(), reviewedAt: null, model: result.model, proposal: result.proposal, acceptedFields: [], reviewedBy: '' });
     } catch (error) {
       setAnalysisError(error instanceof AiAnalysisError ? error.message : (error as Error).message || 'Fotoanalyse fehlgeschlagen. Bitte manuell weiterarbeiten.');
     } finally {
@@ -116,13 +117,13 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
   };
 
   const save = async () => {
-    if (missing.length) {
+    if (missing.length || aiReviewMissing) {
       setShowErrors(true);
       return;
     }
     setSaving(true);
     const newOnes = newPhotos.map(({ id, blob, width, height, createdAt }) => ({ id, blob, width, height, createdAt }));
-    await saveDefect({ ...d, aiAudit: aiAudit.used ? { ...aiAudit, reviewedBy: walk.inspector.trim() } : d.aiAudit ?? null }, newOnes, removed);
+    await saveDefect({ ...d, aiAudit: aiAudit.used ? { ...aiAudit, reviewedBy: aiAudit.reviewedAt ? walk.inspector.trim() : '' } : d.aiAudit ?? null }, newOnes, removed);
     setSaving(false);
     onClose(true);
   };
@@ -194,8 +195,8 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
           {aiAudit.used && <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-muted" role="status">Die Analyse wurde gespeichert. Der ursprüngliche Vorschlag bleibt unverändert.</p>}
           {!online && aiEnabled && <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-muted" role="status">Offline: KI-Analyse nicht verfügbar. Manuelles Erfassen funktioniert weiter.</p>}
           {analysisError && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger" role="alert">{analysisError}</p>}
-          {aiAudit.proposal && <AiProposalCard proposal={aiAudit.proposal} acceptedFields={aiAudit.acceptedFields} checklistIds={checklistIds} onAccept={acceptAiFields} />}
-          {showErrors && missing.length > 0 && <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">Fehlt: {missing.join(', ')}</p>}
+          {aiAudit.proposal && <AiProposalCard proposal={aiAudit.proposal} acceptedFields={aiAudit.acceptedFields} checklistIds={checklistIds} reviewed={!!aiAudit.reviewedAt} onReview={() => setAiAudit((current) => ({ ...current, reviewedAt: new Date().toISOString() }))} onAccept={acceptAiFields} />}
+          {showErrors && (missing.length > 0 || aiReviewMissing) && <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{missing.length > 0 ? `Fehlt: ${missing.join(', ')}. ` : ''}{aiReviewMissing ? 'Bitte bestätige, dass du den KI-Vorschlag fachlich geprüft hast.' : ''}</p>}
         </div>
       </div>
 
@@ -204,7 +205,7 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
           {readOnly ? <button type="button" className="btn-secondary flex-1" onClick={() => onClose(false)}>Schliessen</button> : <>
             {isExisting && <button type="button" className="btn-danger" onClick={() => void remove()} aria-label="Mangel löschen"><Trash size={18} aria-hidden /></button>}
             <button type="button" className="btn-secondary" onClick={() => onClose(false)}>Abbrechen</button>
-            <button type="button" className="btn-primary flex-1" disabled={saving} onClick={() => void save()} data-testid="defect-save">{saving ? 'Speichert' : 'Mangel speichern'}</button>
+            <button type="button" className="btn-primary flex-1" disabled={saving || aiReviewMissing} onClick={() => void save()} data-testid="defect-save">{saving ? 'Speichert' : 'Mangel speichern'}</button>
           </>}
         </div>
       </div>
@@ -212,10 +213,12 @@ export function DefectSheet({ walk, defect, onClose }: { walk: Walk; defect: Def
   );
 }
 
-function AiProposalCard({ proposal, acceptedFields, checklistIds, onAccept }: {
+function AiProposalCard({ proposal, acceptedFields, checklistIds, reviewed, onReview, onAccept }: {
   proposal: AiProposal;
   acceptedFields: AiAcceptedField[];
   checklistIds: string[];
+  reviewed: boolean;
+  onReview: () => void;
   onAccept: (fields: AiAcceptedField[]) => void;
 }) {
   const candidateFields: { id: AiAcceptedField; title: string; value: string }[] = [
@@ -236,6 +239,7 @@ function AiProposalCard({ proposal, acceptedFields, checklistIds, onAccept }: {
     {proposal.passendeGrundlage && <p className="text-xs text-muted">Grundlage laut Checkliste: {proposal.passendeGrundlage}</p>}
     {proposal.hinweis && proposal.mangelErkannt && proposal.sicherheit !== 'niedrig' && <p className="text-sm text-muted">{proposal.hinweis}</p>}
     <p className="text-xs text-muted">Sicherheit: <strong>{proposal.sicherheit}</strong>. Vorschlag, kein Ersatz für die fachliche Beurteilung.</p>
+    <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-surface p-3 text-sm"><input type="checkbox" checked={reviewed} disabled={reviewed} onChange={onReview} className="h-5 w-5 accent-[var(--accent)]" data-testid="ai-reviewed" />Ich habe den KI-Vorschlag geprüft und übernehme die fachliche Verantwortung.</label>
     <button type="button" className="btn-primary w-full" data-testid="accept-all-ai" disabled={!fields.some((field) => !acceptedFields.includes(field.id))} onClick={() => onAccept(fields.map((field) => field.id))}>Alle übernehmen</button>
   </section>;
 }

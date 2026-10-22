@@ -92,7 +92,7 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
   it('prints the AI assistance and human-review audit marker for supported defects only', async () => {
     const pdf = await buildReportPdf({
       walk,
-      defects: [makeDefect({ aiAudit: { used: true, analyzedAt: '2026-10-06T10:00:00Z', model: 'claude-test', proposal: null, acceptedFields: ['hazard'], reviewedBy: 'Max Muster' } })],
+      defects: [makeDefect({ aiAudit: { used: true, analyzedAt: '2026-10-06T10:00:00Z', reviewedAt: '2026-10-06T10:05:00Z', model: 'claude-test', proposal: null, acceptedFields: ['hazard'], reviewedBy: 'Max Muster' } })],
       photos: [], openFromPrevious: [], fileBaseName: 'ai-audit-test',
       settings: { id: 'app', areas: ['QLabs'], priorityDays: { K: 0, H: 2, M: 7, N: 30 }, maxIntervalDays: 14 },
     });

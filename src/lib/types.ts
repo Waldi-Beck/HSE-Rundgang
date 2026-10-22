@@ -67,6 +67,7 @@ export interface AiProposal {
 export interface AiAudit {
   used: boolean;
   analyzedAt: string | null;
+  reviewedAt?: string | null;
   model: string;
   proposal: AiProposal | null;
   acceptedFields: AiAcceptedField[];

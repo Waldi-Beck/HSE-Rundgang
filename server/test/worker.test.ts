@@ -41,7 +41,7 @@ function makeEnv(overrides: Partial<Env> = {}) {
 
 function request(payload: unknown = goodPayload, code = accessCode, requestOrigin = origin) {
   return new Request('https://worker.test/v1/analyze', {
-    method: 'POST', headers: { origin: requestOrigin, 'content-type': 'application/json', 'x-access-code': code }, body: JSON.stringify(payload),
+    method: 'POST', headers: { origin: requestOrigin, 'content-type': 'application/json', 'x-access-code': code, 'cf-connecting-ip': '192.0.2.15' }, body: JSON.stringify(payload),
   });
 }
 
@@ -131,9 +131,15 @@ describe('AI analysis Worker security', () => {
 describe('DailyUsage Durable Object', () => {
   it('enforces the configured daily request limit', async () => {
     const memory = new Map<string, unknown>();
-    const storage = {
+    type MockStorage = {
+      get: (key: string) => Promise<unknown>;
+      put: (values: Record<string, unknown>) => Promise<void>;
+      transaction: <T>(callback: (store: MockStorage) => Promise<T>) => Promise<T>;
+    };
+    const storage: MockStorage = {
       get: async (key: string) => memory.get(key),
       put: async (values: Record<string, unknown>) => { for (const [key, value] of Object.entries(values)) memory.set(key, value); },
+      transaction: async <T>(callback: (store: typeof storage) => Promise<T>) => callback(storage),
     };
     const object = new DailyUsage({ storage } as unknown as DurableObjectState);
     const consume = () => object.fetch(new Request('https://usage.internal', { method: 'POST', body: JSON.stringify({ day: '2026-10-21', limit: 2 }) }));

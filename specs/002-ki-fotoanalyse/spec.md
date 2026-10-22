@@ -81,6 +81,7 @@ Als Unternehmen möchte ich KI standardmässig deaktiviert lassen und vor der er
 - **FR-006**: Systemprompt MUSS Deutsch in Schweizer Schreibweise nutzen, nur visuell belegbare Beobachtungen erlauben, Unsicherheit/kein erkennbarer Mangel klar melden, Massnahmen nach STOP ordnen und Personen weder identifizieren noch beschreiben.
 - **FR-007**: Worker MUSS Anthropic Messages API mit Tool-Use und geschlossenem Antwortschema verwenden; Browser MUSS Antwort mit Zod validieren.
 - **FR-008**: Fotoanalyse-Ergebnis MUSS ausschliesslich Vorschläge darstellen. Kein Feld darf ohne ausdrückliche Einzel- oder „Alles übernehmen“-Aktion geändert werden.
+- **FR-008a**: Ein mit KI unterstützter Mangel MUSS vor dem Speichern ausdrücklich als fachlich geprüft bestätigt werden; Review-Zeitpunkt und Name werden getrennt vom Analyse-Zeitpunkt gespeichert.
 - **FR-009**: Vorschlagskarte MUSS Gefahren, Priorität samt Begründung, Sofortmassnahme, STOP-Massnahmen, passende Grundlage/Kontrollpunkt, Sicherheitsgrad und Hinweis darstellen.
 - **FR-010**: Fehlermeldungen für Offline, Worker nicht erreichbar, falscher Code, Rate-Limit, ungültige/zu grosse Datei und ungültige KI-Antwort MÜSSEN auf Deutsch verständlich sein; manuelles Erfassen bleibt möglich.
 - **FR-011**: Bei erster KI-Aktivierung MUSS eine nicht überspringbare Einwilligung zu Fotoübermittlung an Anthropic in die USA, Nicht-Speicherung/Nicht-Training gemäss Anthropic-Bedingungen, Vermeidung erkennbarer Personen/vertraulicher Unterlagen angezeigt werden; Datum/Zustimmung wird gespeichert.

@@ -128,6 +128,9 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await expect(sheet.getByRole('textbox', { name: 'Sofortmassnahme' })).toHaveValue('Material sofort entfernen und Fluchtweg freihalten.');
   await expect(sheet.getByLabel('Massnahme', { exact: true })).toHaveValue(/Organisatorisch/);
   await expect(sheet.getByText(/Vorgeschlagener Kontrollpunkt: R1/)).toBeVisible();
+  await expect(sheet.getByTestId('defect-save')).toBeDisabled();
+  await sheet.getByTestId('ai-reviewed').check();
+  await expect(sheet.getByTestId('defect-save')).toBeEnabled();
   await sheet.screenshot({ path: `${shots}/02-mangel-mit-foto.png` });
   await sheet.getByTestId('defect-save').click();
   await expect(sheet).toHaveCount(0);

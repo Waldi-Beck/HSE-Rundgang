@@ -6,7 +6,7 @@ import { ZodError } from 'zod';
 export { DailyUsage };
 
 export interface AnalysisServices {
-  consume: (env: Env, code: string) => Promise<boolean>;
+  consume: (env: Env, key: string, limit?: number) => Promise<boolean>;
   analyze: (input: AnalyzeRequest, env: Env) => Promise<{ proposal: unknown; model: string }>;
 }
 
@@ -76,7 +76,7 @@ export function createWorker(services: AnalysisServices = defaultServices) {
     async fetch(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get('origin') ?? '';
     const origins = allowedOrigins(env);
-    if (!origin || !origins.includes(origin)) return json({ error: 'ORIGIN_NOT_ALLOWED' }, 403);
+    if (origins.length === 0 || !origin || !origins.includes(origin)) return json({ error: 'ORIGIN_NOT_ALLOWED' }, 403);
     const headers = corsHeaders(origin, env);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (request.method !== 'POST' || new URL(request.url).pathname !== '/v1/analyze') return json({ error: 'NOT_FOUND' }, 404, headers);
@@ -101,14 +101,20 @@ export function createWorker(services: AnalysisServices = defaultServices) {
     if (image.length < 3 || image.charCodeAt(0) !== 0xff || image.charCodeAt(1) !== 0xd8 || image.charCodeAt(2) !== 0xff) return json({ error: 'INVALID_IMAGE' }, 400, headers);
 
     let allowed: boolean;
-    try { allowed = await services.consume(env, request.headers.get('x-access-code')!); }
+    const clientAddress = request.headers.get('cf-connecting-ip');
+    if (!clientAddress) return json({ error: 'RATE_LIMIT_UNAVAILABLE' }, 503, headers);
+    try {
+      const ipAllowed = await services.consume(env, `ip:${clientAddress}`, 120);
+      if (!ipAllowed) return json({ error: 'RATE_LIMITED' }, 429, headers);
+      allowed = await services.consume(env, `code:${request.headers.get('x-access-code')!}`);
+    }
     catch { return json({ error: 'RATE_LIMIT_UNAVAILABLE' }, 503, headers); }
     if (!allowed) return json({ error: 'RATE_LIMITED' }, 429, headers);
 
     try {
       const result = await services.analyze(parsed.data, env);
       const proposal = AiProposalSchema.parse(result.proposal);
-      return json({ proposal, model: result.model }, 200, headers);
+      return json({ proposal, model: result.model.slice(0, 120) }, 200, headers);
     } catch (error) {
       // Do not log request data, photos, provider response bodies, or credentials.
       const code = (error as Error)?.message === 'ANALYSIS_INVALID' || error instanceof ZodError ? 'ANALYSIS_INVALID' : 'PROVIDER_UNAVAILABLE';

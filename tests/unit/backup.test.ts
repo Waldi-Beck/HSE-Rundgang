@@ -3,6 +3,8 @@ import { BACKUP_FORMAT, BACKUP_VERSION, parseBackup } from '../../src/lib/backup
 import type { Walk } from '../../src/lib/types';
 import { buildBackup } from '../../src/lib/backup';
 import { DEFAULT_REGISTER_SETTINGS } from '../../src/data/register';
+import 'fake-indexeddb/auto';
+import { importBackupData, db } from '../../src/db';
 
 const walk: Walk = {
   id: 'walk-1', docNr: 'HSE-RG-2026-001', date: '2026-10-08', isoYear: 2026, week: 41,
@@ -46,5 +48,10 @@ describe('JSON backup format v4', () => {
     expect(exported.settings).toMatchObject({ aiEnabled: true, aiServerUrl: 'https://worker.example', aiConsentAt: '2026-10-21T12:00:00Z' });
     expect(exported.settings).not.toHaveProperty('aiAccessCode');
     expect(JSON.stringify(exported)).not.toContain('do-not-export-this');
+  });
+
+  it('requires fresh local privacy consent after importing settings from another device', async () => {
+    await importBackupData([], [], [], [], { ...DEFAULT_REGISTER_SETTINGS, aiEnabled: true, aiServerUrl: 'https://worker.example', aiAccessCode: 'not-in-backup', aiConsentAt: '2026-10-21T12:00:00Z' });
+    expect(await db.settings.get('app')).toMatchObject({ aiEnabled: false, aiAccessCode: '', aiConsentAt: null, aiServerUrl: 'https://worker.example' });
   });
 });

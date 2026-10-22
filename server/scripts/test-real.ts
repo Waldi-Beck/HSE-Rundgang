@@ -24,6 +24,14 @@ const input = AnalyzeRequestSchema.parse({
     priorities: { K: { name: 'Kritisch', days: 0 }, H: { name: 'Hoch', days: 2 }, M: { name: 'Mittel', days: 7 }, N: { name: 'Niedrig', days: 30 } },
   },
 });
-const result = await analyzeWithClaude(input, { ANTHROPIC_API_KEY: vars.ANTHROPIC_API_KEY, CLAUDE_MODEL: vars.CLAUDE_MODEL });
-if (result.proposal.hinweis.toLowerCase().includes('api_key') || SYSTEM_PROMPT.includes(vars.ANTHROPIC_API_KEY)) throw new Error('Sicherheitsprüfung fehlgeschlagen.');
-console.log(JSON.stringify(result, null, 2));
+try {
+  const result = await analyzeWithClaude(input, { ANTHROPIC_API_KEY: vars.ANTHROPIC_API_KEY, CLAUDE_MODEL: vars.CLAUDE_MODEL });
+  if (result.proposal.hinweis.toLowerCase().includes('api_key') || SYSTEM_PROMPT.includes(vars.ANTHROPIC_API_KEY)) throw new Error('Sicherheitsprüfung fehlgeschlagen.');
+  console.log(JSON.stringify(result, null, 2));
+} catch (error) {
+  const status = (error as { status?: number }).status;
+  if (status === 401) throw new Error('Anthropic hat den API-Schlüssel abgelehnt (401). Prüfe .dev.vars; teile den Schlüssel nie.');
+  if (status === 403) throw new Error('Anthropic hat den Zugriff verweigert (403). Prüfe Konto, Modellberechtigung und Abrechnung.');
+  if (status === 429) throw new Error('Anthropic Rate-Limit oder Kontingent erreicht (429). Bitte später erneut versuchen.');
+  throw new Error('Der manuelle Anthropic-Test ist fehlgeschlagen. Prüfe Netzwerk, Modellkennung und Konto; Details/Schlüssel werden aus Sicherheitsgründen nicht ausgegeben.');
+}

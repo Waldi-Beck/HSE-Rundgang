@@ -16,7 +16,7 @@ describe('Excel register export', () => {
   it('contains only the round and defect sheets with workbook-compatible column ordering', async () => {
     const defect: Defect = {
       id: 'd1', walkId: walk.id, nr: 1, mangelId: '2026-10-08-M01', itemId: 'R1', area: 'qps', description: 'Gefahr', hazard: 'Stolpern', immediateAction: '', action: '', responsible: '', priority: 'H', due: '2026-10-10', status: 'open', doneAt: null, recheckAt: null, controlledBy: '', fixed: null, newDue: '', note: '', createdAt: '', updatedAt: '',
-      aiAudit: { used: true, analyzedAt: '2026-10-08T08:10:00Z', model: 'claude-test', proposal: null, acceptedFields: ['hazard'], reviewedBy: 'Max Muster' },
+      aiAudit: { used: true, analyzedAt: '2026-10-08T08:10:00Z', reviewedAt: '2026-10-08T08:15:00Z', model: 'claude-test', proposal: null, acceptedFields: ['hazard'], reviewedBy: 'Max Muster' },
     };
     const bytes = await buildRegisterWorkbook({ walks: [walk], defects: [defect], settings: DEFAULT_REGISTER_SETTINGS });
     const workbook = new ExcelJS.Workbook();
@@ -29,7 +29,7 @@ describe('Excel register export', () => {
     expect(header('Mängel')).toEqual([
       'Mangel-ID', 'Datum', 'KW', 'Nr. im Formular', 'Bereich', 'Kontrollpunkt', 'Beschreibung des Mangels', 'Festgestellte Gefahr', 'Priorität', 'KI-Unterstützung', 'Sofortmassnahme', 'Massnahme', 'Verantwortlich', 'Frist', 'Status', 'Erledigt am', 'Nachkontrolle am', 'Kontrolliert von', 'Mangel behoben?', 'Neuer Termin (bei Nein)', 'Gültige Frist', 'Tage offen', 'Überfällig', 'Bemerkung', 'Rundgang-Nr.',
     ]);
-    expect(workbook.getWorksheet('Mängel')?.getRow(2).getCell(10).value).toBe('Ja — durch Max Muster geprüft');
+    expect(workbook.getWorksheet('Mängel')?.getRow(2).getCell(10).value).toBe('Ja — 2026-10-08 durch Max Muster geprüft');
     expect(workbook.getWorksheet('Rundgänge')?.getRow(2).getCell(18).value).toBe('HSE-RG_2026_10_08');
     expect(workbook.getWorksheet('Rundgänge')?.getRow(2).getCell(16).value).toBe('HSE-RG_2026_10_08.pdf');
   });

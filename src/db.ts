@@ -365,7 +365,13 @@ export async function importBackupData(
     if (defects.length) await db.defects.bulkPut(defects);
     if (photos.length) await db.photos.bulkPut(photos);
     if (incomingInspections.length) await db.inspections.bulkPut(incomingInspections);
-    if (incomingSettings) await db.settings.put({ ...incomingSettings, aiAccessCode: '', id: 'app' });
+    if (incomingSettings) await db.settings.put({
+      ...incomingSettings,
+      aiEnabled: false,
+      aiAccessCode: '',
+      aiConsentAt: null,
+      id: 'app',
+    });
     return { walks: accepted.size, defects: defects.length, photos: photos.length, inspections: incomingInspections.length, collisions };
   });
 }

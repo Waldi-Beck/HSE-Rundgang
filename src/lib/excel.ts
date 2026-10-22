@@ -115,7 +115,7 @@ export async function buildRegisterWorkbook(input: RegisterWorkbookInput): Promi
       defect.description,
       defect.hazard,
       PRIORITY_KEY_TO_TEXT[defect.priority],
-      defect.aiAudit?.used ? `Ja — durch ${defect.aiAudit.reviewedBy || walk?.inspector || 'nicht angegeben'} geprüft` : 'Nein',
+        defect.aiAudit?.used && defect.aiAudit.reviewedAt ? `Ja — ${defect.aiAudit.reviewedAt.slice(0, 10)} durch ${defect.aiAudit.reviewedBy || walk?.inspector || 'nicht angegeben'} geprüft` : defect.aiAudit?.used ? 'KI genutzt — Prüfung offen' : 'Nein',
       defect.immediateAction,
       defect.action,
       defect.responsible,

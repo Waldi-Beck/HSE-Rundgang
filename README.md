@@ -86,9 +86,9 @@ Die KI ist **standardmässig ausgeschaltet**. Ohne Einrichtung funktionieren Che
 
 3. `server/.dev.vars.example` als `server/.dev.vars` kopieren und die neue Datei lokal mit einem Texteditor öffnen. Platzhalter ersetzen:
   - `ANTHROPIC_API_KEY`: API-Schlüssel im Anthropic Console-Konto erstellen und nur hier einsetzen.
-  - `CLAUDE_MODEL`: von der Organisation freigegebene Modellkennung.
   - `ACCESS_CODE`: langen zufälligen Zugangscode wählen und sicher an Nutzende weitergeben.
   - `ALLOWED_ORIGINS`: nur tatsächliche App-URLs aufführen (lokal `http://localhost:4173`, online `https://waldi-beck.github.io`). Keine Wildcards verwenden.
+  - `CLAUDE_MODEL` und `MAX_REQUESTS_PER_DAY`: nicht geheime Worker-Einstellungen; die Modellkennung wird in `server/wrangler.toml` festgelegt, das Limit steht standardmässig auf 30.
 
   **Wichtig:** `server/.dev.vars` ist in Git ignoriert. Deren Inhalt nie teilen, committen oder in die App eintragen.
 
@@ -111,16 +111,15 @@ Die KI ist **standardmässig ausgeschaltet**. Ohne Einrichtung funktionieren Che
 ### Für andere Personen im Internet veröffentlichen
 
 1. Im `server`-Ordner einmalig `npx wrangler login` ausführen.
-2. Cloudflare fragt die drei Werte sicher interaktiv ab:
+2. Cloudflare fragt die Geheimnisse sicher interaktiv ab:
 
   ```bash
   npx wrangler secret put ANTHROPIC_API_KEY
   npx wrangler secret put ACCESS_CODE
-  npx wrangler secret put CLAUDE_MODEL
   ```
 
   Den Anthropic-Schlüssel nie direkt in einen Befehl oder ein Repository schreiben.
-3. In `server/wrangler.toml` unter `ALLOWED_ORIGINS` die exakte veröffentlichte App-Adresse eintragen. Danach aus `server` deployen:
+3. In `server/wrangler.toml` `CLAUDE_MODEL` sowie unter `ALLOWED_ORIGINS` die exakte veröffentlichte App-Adresse kontrollieren. Danach aus `server` deployen:
 
   ```bash
   npx wrangler deploy

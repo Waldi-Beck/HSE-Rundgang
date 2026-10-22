@@ -42,18 +42,19 @@ export type AnalyzeRequest = z.infer<typeof AnalyzeRequestSchema>;
 
 export const ANTHROPIC_TOOL = {
   name: 'report_safety_photo_analysis',
-  description: 'Gib eine strukturierte, vorsichtige und unverbindliche HSE Fotoanalyse zurück.',
+  description: 'Gib eine strukturierte, vorsichtige und unverbindliche HSE Fotoanalyse zurück. Höchstens 8 Gefahren und 12 Massnahmen.',
+  strict: true,
   input_schema: {
     type: 'object',
     additionalProperties: false,
     required: ['mangelErkannt', 'gefahren', 'vorgeschlagenePrio', 'begruendungPrio', 'sofortmassnahme', 'massnahmen', 'passendeGrundlage', 'passenderKontrollpunkt', 'sicherheit', 'hinweis'],
     properties: {
       mangelErkannt: { type: 'boolean' },
-      gefahren: { type: 'array', maxItems: 8, items: { type: 'object', additionalProperties: false, required: ['beschreibung', 'folge'], properties: { beschreibung: { type: 'string' }, folge: { type: 'string' } } } },
+      gefahren: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['beschreibung', 'folge'], properties: { beschreibung: { type: 'string' }, folge: { type: 'string' } } } },
       vorgeschlagenePrio: { anyOf: [{ type: 'string', enum: ['K', 'H', 'M', 'N'] }, { type: 'null' }] },
       begruendungPrio: { type: 'string' },
       sofortmassnahme: { type: 'string' },
-      massnahmen: { type: 'array', maxItems: 12, items: { type: 'object', additionalProperties: false, required: ['text', 'stopStufe'], properties: { text: { type: 'string' }, stopStufe: { type: 'string', enum: ['Substitution', 'Technisch', 'Organisatorisch', 'Persönlich'] } } } },
+      massnahmen: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['text', 'stopStufe'], properties: { text: { type: 'string' }, stopStufe: { type: 'string', enum: ['Substitution', 'Technisch', 'Organisatorisch', 'Persönlich'] } } } },
       passendeGrundlage: { type: 'string' },
       passenderKontrollpunkt: { anyOf: [{ type: 'string' }, { type: 'null' }] },
       sicherheit: { type: 'string', enum: ['hoch', 'mittel', 'niedrig'] },
