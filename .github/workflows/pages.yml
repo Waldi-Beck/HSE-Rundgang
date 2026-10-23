@@ -28,6 +28,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run worker:typecheck
       - run: npm test
+      - run: npm run test:e2e
       - name: Build
         run: npm run build
         env:

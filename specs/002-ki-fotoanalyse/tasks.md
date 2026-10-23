@@ -34,7 +34,7 @@
 - [x] T031 Client-Request mit Kontext, verständlichen Fehlercodes und Abort/Timeout in `src/lib/ai-analysis.ts`.
 - [x] T032 Analyseknopf nur bei KI aktiviert, Worker-URL, Zustimmung, Foto und Onlinezustand im Mängel-Formular anbieten.
 - [x] T033 Vorschlagskarte, niedrige Sicherheit/kein Mangel-Warnung, Feldweise/Alles-Übernehmen ohne Auto-Write implementieren.
-- [x] T034 Prüfspur samt unverändertem Vorschlag, Modell/Zeit, acceptedFields und human reviewer in Defektentwurf/Persistenz ergänzen.
+- [x] T034 Prüfspur samt unverändertem Vorschlag, Modell/Analysezeit, expliziter Review-Bestätigung/-Zeit, acceptedFields und human reviewer vor Speichern ergänzen.
 - [x] T035 Unit-Tests für Bildfit, Zod gültig/ungültig/unvollständig, Feldübernahme und unveränderlichen Auditvorschlag.
 - [x] T036 Playwright-Tests für gemockten Worker: Analyse, alles übernehmen, speichern und Offline/Fehlerfall.
 

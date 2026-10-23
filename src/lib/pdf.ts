@@ -330,12 +330,6 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
           doc.setTextColor(...MUTED);
           doc.text(doc.splitTextToSize(`Mit KI-Unterstützung erstellt, durch ${reviewer} geprüft`, cell.cell.width - 3), cell.cell.x + 1.5, cell.cell.y + 21);
         }
-        if (defect.aiAudit?.used && defect.aiAudit.reviewedAt) {
-          const reviewer = defect.aiAudit.reviewedBy || walk.inspector || 'nicht angegeben';
-          doc.setFontSize(5.2);
-          doc.setTextColor(...MUTED);
-          doc.text(doc.splitTextToSize(`Mit KI-Unterstützung erstellt, durch ${reviewer} geprüft`, cell.cell.width - 3), cell.cell.x + 1.5, cell.cell.y + 21);
-        }
       }
       if (cell.column.index === 4) {
         const firstPhoto = photosFor(defect.id)[0];
