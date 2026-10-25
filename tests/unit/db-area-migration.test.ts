@@ -29,7 +29,7 @@ describe('Migration der Checklistenbereiche auf QPS, QLabs und xTec', () => {
     try {
       await db.open();
       const walk = await db.walks.get('legacy-walk');
-      expect(db.verno).toBe(6);
+      expect(db.verno).toBe(7);
       expect(walk?.ratings).toMatchObject({ 'R4@qps': 'mangel', 'R4@qlabs': 'ok', 'R4@xtec': 'na' });
       expect(walk?.ratings).not.toHaveProperty('R4@engineering');
       expect(walk?.ratings).not.toHaveProperty('R4@qmeasure');

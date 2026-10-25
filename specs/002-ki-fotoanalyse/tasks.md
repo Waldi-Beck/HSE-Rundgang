@@ -48,5 +48,11 @@
 
  - [x] T053 `.dev.vars`/`.env`/API keys mittels git status und Secret-Pattern-Scan ausschliessen; Feature lokal committen und **nicht pushen**.
 
+## Phase 7: Konkrete Mangelbeschreibung
+
+- [x] T060 `mangelBeschreibung` getrennt von Gefahren in Worker- und Frontend-Schema ergänzen.
+- [x] T061 Mangelbeschreibung einzeln/mit „Alles übernehmen“ nur nach ausdrücklicher Bestätigung ins Mängelfeld übernehmen.
+- [x] T062 Tests und API-/Datenmodellvertrag für die sichtbare Mangelbeschreibung aktualisieren.
+
 ## Abhängigkeiten
 - T050-T053 zuletzt.

@@ -7,6 +7,7 @@ const fixture = path.resolve('tests/fixtures/mangel-fluchtweg.jpg');
 const ROOMS = ['qps', 'qlabs', 'xtec'];
 const AI_PROPOSAL = {
   mangelErkannt: true,
+  mangelBeschreibung: 'Feuerlöscher ist hinter abgestelltem Material verdeckt.',
   gefahren: [{ beschreibung: 'Fluchtweg ist durch Material blockiert.', folge: 'Evakuierung kann verzögert werden.' }],
   vorgeschlagenePrio: 'H', begruendungPrio: 'Ein Fluchtweg ist eingeschränkt; zeitnahe Behebung empfohlen.',
   sofortmassnahme: 'Material sofort entfernen und Fluchtweg freihalten.',
@@ -120,9 +121,11 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await expect(sheet.getByTestId('photo-list').locator('img')).toHaveCount(1);
   await sheet.getByTestId('analyze-photo').click();
   await expect(sheet.getByTestId('ai-proposal')).toBeVisible();
+  await expect(sheet.getByTestId('ai-proposal')).toContainText('Mangelbeschreibung');
   expect(analysisRequest?.context).toMatchObject({ area: 'QLabs', itemId: 'R4', basis: expect.any(String) });
   expect(JSON.stringify(analysisRequest)).not.toContain('ANTHROPIC_API_KEY');
   await sheet.getByTestId('accept-all-ai').click();
+  await expect(sheet.getByLabel('Beschreibung des Mangels')).toHaveValue('Feuerlöscher ist hinter abgestelltem Material verdeckt.');
   await expect(sheet.getByLabel('Festgestellte Gefahr')).toHaveValue(/Fluchtweg ist durch Material blockiert/);
   await expect(sheet.getByRole('radio', { name: /Hoch/ })).toHaveAttribute('aria-checked', 'true');
   await expect(sheet.getByRole('textbox', { name: 'Sofortmassnahme' })).toHaveValue('Material sofort entfernen und Fluchtweg freihalten.');
@@ -198,7 +201,7 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await expect(page.getByTestId(/round-row/).first()).toContainText(docNr!);
   await page.getByRole('tab', { name: 'Mängel' }).click();
   await expect(page.getByText('2026-').first()).toBeVisible();
-  await expect(page.getByText('Feuerlöscher hinter Material abgestellt')).toBeVisible();
+  await expect(page.getByText('Feuerlöscher ist hinter abgestelltem Material verdeckt.')).toBeVisible();
   const [xlsx] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Excel exportieren' }).click()]);
   expect(xlsx.suggestedFilename()).toMatch(/^HSE-Rundgang_Register_\d{4}-\d{2}-\d{2}\.xlsx$/);
   const xlsxPath = test.info().outputPath(xlsx.suggestedFilename());
@@ -211,7 +214,7 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await page.getByTestId('new-walk').click();
   const secondDocNr = (await page.getByTestId('walk-docnr').textContent())?.trim();
   expect(secondDocNr).toMatch(/^HSE-RG_\d{4}_\d{2}_\d{2}$/);
-  await expect(page.getByTestId('open-points')).toContainText('Feuerlöscher hinter Material abgestellt');
+  await expect(page.getByTestId('open-points')).toContainText('Feuerlöscher ist hinter abgestelltem Material verdeckt.');
   await expect(page.getByTestId('monthly-checked')).not.toBeChecked();
   const secondEndTime = await page.getByLabel('Uhrzeit Beginn').evaluate((element: HTMLInputElement) => {
     const [hour, minute] = element.value.split(':').map(Number);

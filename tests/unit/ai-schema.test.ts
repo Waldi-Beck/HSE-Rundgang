@@ -3,6 +3,7 @@ import { AiProposalSchema } from '../../src/lib/ai-schema';
 
 const valid = {
   mangelErkannt: true,
+  mangelBeschreibung: 'Ein Kabel liegt quer über dem Gehweg.',
   gefahren: [{ beschreibung: 'Kabel liegt im Gehweg', folge: 'Stolpern und Sturz' }],
   vorgeschlagenePrio: 'H', begruendungPrio: 'Direkte Stolpergefahr im Verkehrsweg.',
   sofortmassnahme: 'Kabel sichern.', massnahmen: [{ text: 'Kabelbrücke montieren.', stopStufe: 'Technisch' }],

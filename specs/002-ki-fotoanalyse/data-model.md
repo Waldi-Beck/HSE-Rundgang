@@ -24,6 +24,7 @@ Unveränderte Vorschläge und Übernahmeliste bilden getrennte Werte. Manuelle s
 ### AiProposal (strict JSON, auch Worker und App)
 
 - `mangelErkannt: boolean`
+- `mangelBeschreibung: string` – kurze, konkrete Beschreibung des im Foto sichtbaren Mangels; getrennt von Gefahren und möglichen Folgen. Wird nur nach ausdrücklicher Feldübernahme in `Defect.description` geschrieben.
 - `gefahren: { beschreibung: string; folge: string }[]`
 - `vorgeschlagenePrio: 'K' | 'H' | 'M' | 'N' | null`
 - `begruendungPrio: string`
@@ -50,4 +51,4 @@ Unveränderte Vorschläge und Übernahmeliste bilden getrennte Werte. Manuelle s
 
 ## Migration and Backup
 
-Dexie Version 6 ergänzt die Settings-Felder mit sicheren Defaults und neue optionale Auditfelder in Mängeln (Schema keine neue Tabelle nötig). Backups bleiben Formatversion 4 lesbar; vorhandene Defekte erhalten `aiAudit: null` beim Lesen/Migration. Export/Import nimmt Prüfspur mit, niemals lokale Worker-Zugangsdaten. `serverUrl`, `enabled`, `consentAt` können im lokalen Backup gespeichert werden; `accessCode` wird beim Export explizit entfernt und nach Import neu eingegeben.
+Dexie Version 6 ergänzt die Settings-Felder mit sicheren Defaults und neue optionale Auditfelder in Mängeln (Schema keine neue Tabelle nötig). Version 7 ergänzt für bereits gespeicherte KI-Vorschläge `mangelBeschreibung: ''`, damit alte Auditdaten lesbar bleiben. Backups bleiben Formatversion 4 lesbar; vorhandene Defekte erhalten `aiAudit: null` beim Lesen/Migration. Export/Import nimmt Prüfspur mit, niemals lokale Worker-Zugangsdaten. `serverUrl`, `enabled`, `consentAt` können im lokalen Backup gespeichert werden; `accessCode` wird beim Export explizit entfernt und nach Import neu eingegeben.

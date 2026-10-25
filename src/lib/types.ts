@@ -39,7 +39,7 @@ export interface Walk {
 
 export type DefectStatus = 'open' | 'inProgress' | 'done' | 'recheck';
 
-export type AiAcceptedField = 'hazard' | 'priority' | 'immediateAction' | 'action' | 'itemId';
+export type AiAcceptedField = 'description' | 'hazard' | 'priority' | 'immediateAction' | 'action' | 'itemId';
 
 export interface AiHazardProposal {
   beschreibung: string;
@@ -53,6 +53,7 @@ export interface AiMeasureProposal {
 
 export interface AiProposal {
   mangelErkannt: boolean;
+  mangelBeschreibung: string;
   gefahren: AiHazardProposal[];
   vorgeschlagenePrio: PriorityKey | null;
   begruendungPrio: string;

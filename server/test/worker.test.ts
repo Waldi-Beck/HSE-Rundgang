@@ -15,6 +15,7 @@ const goodPayload = {
 };
 const validProposal = {
   mangelErkannt: true,
+  mangelBeschreibung: 'Ein Kabel liegt quer über dem Gehweg.',
   gefahren: [{ beschreibung: 'Kabel liegt quer', folge: 'Stolpern' }],
   vorgeschlagenePrio: 'M', begruendungPrio: 'Stolpergefahr', sofortmassnahme: 'Kabel sichern',
   massnahmen: [{ text: 'Kabelbrücke montieren', stopStufe: 'Technisch' }], passendeGrundlage: 'Vorschrift X',

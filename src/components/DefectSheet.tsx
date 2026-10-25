@@ -222,6 +222,7 @@ function AiProposalCard({ proposal, acceptedFields, checklistIds, reviewed, onRe
   onAccept: (fields: AiAcceptedField[]) => void;
 }) {
   const candidateFields: { id: AiAcceptedField; title: string; value: string }[] = [
+    { id: 'description', title: 'Mangelbeschreibung', value: String(aiFieldValue(proposal, 'description', checklistIds) ?? '') },
     { id: 'hazard', title: 'Gefahren', value: String(aiFieldValue(proposal, 'hazard', checklistIds) ?? '') },
     { id: 'priority', title: `Priorität${proposal.begruendungPrio ? ` – ${proposal.begruendungPrio}` : ''}`, value: proposal.vorgeschlagenePrio ? `${proposal.vorgeschlagenePrio}: ${PRIORITY_KEY_TO_TEXT[proposal.vorgeschlagenePrio]}` : '' },
     { id: 'immediateAction', title: 'Sofortmassnahme', value: String(aiFieldValue(proposal, 'immediateAction', checklistIds) ?? '') },

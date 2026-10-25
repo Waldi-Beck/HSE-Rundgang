@@ -5,7 +5,7 @@ import type { AiAnalysisConfig } from '../../src/lib/ai-analysis';
 
 const config: AiAnalysisConfig = { enabled: true, consentAt: '2026-10-21T12:00:00Z', serverUrl: 'https://worker.example', accessCode: 'local-code' };
 const proposal = {
-  mangelErkannt: true, gefahren: [{ beschreibung: 'Kabel liegt im Weg', folge: 'Sturz' }], vorgeschlagenePrio: 'H',
+  mangelErkannt: true, mangelBeschreibung: 'Ein Kabel liegt quer über dem Gehweg.', gefahren: [{ beschreibung: 'Kabel liegt im Weg', folge: 'Sturz' }], vorgeschlagenePrio: 'H',
   begruendungPrio: 'Verkehrsweg blockiert.', sofortmassnahme: 'Kabel sichern.',
   massnahmen: [{ text: 'Kabelbrücke montieren.', stopStufe: 'Technisch' }], passendeGrundlage: 'VUV Art. 19',
   passenderKontrollpunkt: 'R6', sicherheit: 'hoch', hinweis: 'Bitte vor Ort prüfen.',

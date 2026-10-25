@@ -28,7 +28,7 @@ Body (strict Zod contract, unknown fields rejected):
 `200 application/json; Cache-Control: no-store`
 
 ```json
-{ "proposal": { "mangelErkannt": true, "gefahren": [], "vorgeschlagenePrio": "H", "begruendungPrio": "…", "sofortmassnahme": "…", "massnahmen": [], "passendeGrundlage": "…", "passenderKontrollpunkt": "R1", "sicherheit": "mittel", "hinweis": "…" }, "model": "provider-returned-model-id" }
+{ "proposal": { "mangelErkannt": true, "mangelBeschreibung": "Kabel liegt quer über dem Gehweg.", "gefahren": [], "vorgeschlagenePrio": "H", "begruendungPrio": "…", "sofortmassnahme": "…", "massnahmen": [], "passendeGrundlage": "…", "passenderKontrollpunkt": "R1", "sicherheit": "mittel", "hinweis": "…" }, "model": "provider-returned-model-id" }
 ```
 
 ### Error codes

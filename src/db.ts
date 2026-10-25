@@ -137,6 +137,24 @@ db.version(6)
     await tx.table('defects').bulkPut(defects.map((defect) => ({ ...defect, aiAudit: defect.aiAudit ?? null })));
   });
 
+db.version(7)
+  .stores({
+    walks: 'id, date, status, &docNr',
+    defects: 'id, walkId, status, itemId, area, mangelId',
+    photos: 'id, defectId',
+    counters: '&year',
+    inspections: 'id, area',
+    settings: '&id',
+  })
+  .upgrade(async (tx) => {
+    const defects = await tx.table('defects').toArray() as Defect[];
+    await tx.table('defects').bulkPut(defects.map((defect) => {
+      const proposal = defect.aiAudit?.proposal;
+      if (!proposal || typeof (proposal as { mangelBeschreibung?: unknown }).mangelBeschreibung === 'string') return defect;
+      return { ...defect, aiAudit: { ...defect.aiAudit!, proposal: { ...proposal, mangelBeschreibung: '' } } };
+    }));
+  });
+
 export const uid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
 const emptySignature = () => ({ name: '', date: '', image: '' });

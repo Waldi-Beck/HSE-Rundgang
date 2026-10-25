@@ -5,6 +5,7 @@ const boundedText = z.string().max(1600);
 
 export const AiProposalSchema = z.object({
   mangelErkannt: z.boolean(),
+  mangelBeschreibung: z.string().max(1200),
   gefahren: z.array(z.object({ beschreibung: z.string().min(1).max(1200), folge: z.string().min(1).max(1200) }).strict()).max(8),
   vorgeschlagenePrio: z.enum(['K', 'H', 'M', 'N']).nullable(),
   begruendungPrio: boundedText,

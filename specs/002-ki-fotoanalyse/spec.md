@@ -9,7 +9,7 @@
 
 ### User Story 1 – Sicheres, unverbindliches KI-Vorschlagen (Priority: P1)
 
-Als prüfende Person möchte ich ein Mängelfoto optional durch Claude analysieren lassen, damit ich mögliche Gefahren und STOP-Massnahmen als Ergänzung für meine eigene Beurteilung erhalte.
+Als prüfende Person möchte ich ein Mängelfoto optional durch Claude analysieren lassen, damit ich eine sachliche Mangelbeschreibung, mögliche Gefahren und STOP-Massnahmen als Ergänzung für meine eigene Beurteilung erhalte.
 
 **Why this priority**: Sichere Vorschläge im Mängel-Formular sind der Kernnutzen; sie dürfen weder manuelle Erfassung blockieren noch Entscheidungen automatisch speichern.
 
@@ -19,7 +19,7 @@ Als prüfende Person möchte ich ein Mängelfoto optional durch Claude analysier
 
 1. **Given** KI ist deaktiviert, **When** ein Foto angefügt wird, **Then** bleiben Foto- und manuelle Mängelerfassung wie bisher nutzbar und es erscheint keine Analyseaktion.
 2. **Given** KI ist aktiviert, Einwilligung erteilt und Worker erreichbar, **When** ein Foto zur Analyse ausgewählt wird, **Then** werden Bild, Abteilungs-/Kontrollpunktkontext, Grundlagen, Prioritätsdefinitionen und optionaler Entwurfstext übertragen und die Antwort wird vor Anzeige strikt validiert.
-3. **Given** ein gültiger Vorschlag wird angezeigt, **When** die prüfende Person einzelne Felder oder „Alles übernehmen“ bestätigt, **Then** werden nur die explizit ausgewählten Felder in den editierbaren Entwurf übernommen.
+3. **Given** ein gültiger Vorschlag wird angezeigt, **When** die prüfende Person einzelne Felder oder „Alles übernehmen“ bestätigt, **Then** werden nur die explizit ausgewählten Felder – einschliesslich einer konkreten sichtbaren Mangelbeschreibung – in den editierbaren Entwurf übernommen.
 4. **Given** niedrige Sicherheit oder „kein Mangel erkannt“, **When** der Vorschlag angezeigt wird, **Then** wird ein deutlicher Hinweis ausgegeben; manuelle Eingabe bleibt möglich.
 
 ### User Story 2 – Datenschutz und sicherer Worker (Priority: P1)
@@ -82,7 +82,7 @@ Als Unternehmen möchte ich KI standardmässig deaktiviert lassen und vor der er
 - **FR-007**: Worker MUSS Anthropic Messages API mit Tool-Use und geschlossenem Antwortschema verwenden; Browser MUSS Antwort mit Zod validieren.
 - **FR-008**: Fotoanalyse-Ergebnis MUSS ausschliesslich Vorschläge darstellen. Kein Feld darf ohne ausdrückliche Einzel- oder „Alles übernehmen“-Aktion geändert werden.
 - **FR-008a**: Ein mit KI unterstützter Mangel MUSS vor dem Speichern ausdrücklich als fachlich geprüft bestätigt werden; Review-Zeitpunkt und Name werden getrennt vom Analyse-Zeitpunkt gespeichert.
-- **FR-009**: Vorschlagskarte MUSS Gefahren, Priorität samt Begründung, Sofortmassnahme, STOP-Massnahmen, passende Grundlage/Kontrollpunkt, Sicherheitsgrad und Hinweis darstellen.
+- **FR-009**: Vorschlagskarte MUSS die konkrete, vom Foto belegte Mangelbeschreibung getrennt von Gefahren/Folgen sowie Priorität samt Begründung, Sofortmassnahme, STOP-Massnahmen, passende Grundlage/Kontrollpunkt, Sicherheitsgrad und Hinweis darstellen.
 - **FR-010**: Fehlermeldungen für Offline, Worker nicht erreichbar, falscher Code, Rate-Limit, ungültige/zu grosse Datei und ungültige KI-Antwort MÜSSEN auf Deutsch verständlich sein; manuelles Erfassen bleibt möglich.
 - **FR-011**: Bei erster KI-Aktivierung MUSS eine nicht überspringbare Einwilligung zu Fotoübermittlung an Anthropic in die USA, Nicht-Speicherung/Nicht-Training gemäss Anthropic-Bedingungen, Vermeidung erkennbarer Personen/vertraulicher Unterlagen angezeigt werden; Datum/Zustimmung wird gespeichert.
 - **FR-012**: KI-Nutzung MUSS pro Mangel persistiert werden: genutzt, Zeitpunkt, Modell, unveränderter validierter Vorschlag, übernommene Feldnamen und menschlicher Prüfende/r.
