@@ -117,6 +117,8 @@ export function createWorker(services: AnalysisServices = defaultServices) {
       return json({ proposal, model: result.model.slice(0, 120) }, 200, headers);
     } catch (error) {
       // Do not log request data, photos, provider response bodies, or credentials.
+      const providerStatus = (error as { status?: unknown })?.status;
+      if (typeof providerStatus === 'number') console.warn('Anthropic provider request failed', providerStatus);
       const code = (error as Error)?.message === 'ANALYSIS_INVALID' || error instanceof ZodError ? 'ANALYSIS_INVALID' : 'PROVIDER_UNAVAILABLE';
       return json({ error: code }, 502, headers);
     }
