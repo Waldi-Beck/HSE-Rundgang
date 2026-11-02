@@ -264,3 +264,16 @@ test('offline bleibt die manuelle Mängelerfassung nutzbar und KI zeigt einen ve
   await expect(page.getByText('Mangel speichern')).toHaveCount(0);
   await page.context().setOffline(false);
 });
+
+test('einzelnen Rundgang samt Bestätigungsdialog löschen', async ({ page }) => {
+  page.on('dialog', (dialog) => dialog.accept());
+  await page.goto('/');
+  await page.getByTestId('new-walk').click();
+  const docNr = (await page.getByTestId('walk-docnr').textContent())?.trim();
+  await page.getByRole('link', { name: 'Übersicht', exact: true }).click();
+  const deleteButton = page.getByRole('button', { name: /Rundgang .*0 Mängeln löschen/ });
+  await expect(deleteButton).toBeVisible();
+  await deleteButton.click();
+  await expect(page.getByText(docNr!, { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Noch kein Rundgang erfasst' })).toBeVisible();
+});

@@ -1,16 +1,17 @@
-import { CaretRight, Plus, WarningCircle } from '@phosphor-icons/react';
+import { CaretRight, Plus, Trash, WarningCircle } from '@phosphor-icons/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { createWalk, db } from '../db';
+import { createWalk, db, deleteWalk } from '../db';
 import { displayWalkNumber, formatDate, weekLabel } from '../lib/dates';
 import { overviewMetrics, roundRegisterRows } from '../lib/register';
-import { Badge, EmptyState } from '../components/ui';
+import { Badge, EmptyState, useToast } from '../components/ui';
 import { useRegisterSettings } from '../components/SettingsContext';
 
 export function DashboardPage() {
   const navigate = useNavigate();
   const settings = useRegisterSettings();
+  const toast = useToast();
   const [creating, setCreating] = useState(false);
   const walks = useLiveQuery(() => db.walks.toArray());
   const defects = useLiveQuery(() => db.defects.toArray());
@@ -26,6 +27,13 @@ export function DashboardPage() {
     } finally {
       setCreating(false);
     }
+  };
+
+  const removeWalk = async (walkId: string, date: string, inspector: string, defectCount: number) => {
+    const details = `${displayWalkNumber(date)} · ${inspector || 'ohne Namen'} · ${defectCount} Mängel`;
+    if (!window.confirm(`Rundgang ${details} endgültig löschen? Zugehörige Mängel und Fotos werden ebenfalls gelöscht.`)) return;
+    await deleteWalk(walkId);
+    toast('Rundgang mit zugehörigen Mängeln und Fotos gelöscht.');
   };
 
   return (
@@ -113,8 +121,8 @@ export function DashboardPage() {
             {recentRounds.length ? (
               <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
                 {recentRounds.map(({ walk, defectCount, interval, monthlyWarning }) => (
-                  <li key={walk.id}>
-                    <Link to={`/rundgang/${walk.id}/daten`} className="flex items-center gap-3 px-4 py-3 active:bg-surface-2">
+                  <li key={walk.id} className="flex items-center gap-2 pr-2">
+                    <Link to={`/rundgang/${walk.id}/daten`} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 active:bg-surface-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold">{displayWalkNumber(walk.date)}</span>
@@ -126,6 +134,9 @@ export function DashboardPage() {
                       </div>
                       <CaretRight size={18} className="shrink-0 text-muted" aria-hidden />
                     </Link>
+                    <button type="button" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-danger hover:bg-danger-soft" aria-label={`Rundgang ${displayWalkNumber(walk.date)} vom ${formatDate(walk.date)} mit ${defectCount} Mängeln löschen`} onClick={() => void removeWalk(walk.id, walk.date, walk.inspector, defectCount)}>
+                      <Trash size={19} aria-hidden />
+                    </button>
                   </li>
                 ))}
               </ul>
