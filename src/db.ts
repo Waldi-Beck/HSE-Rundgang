@@ -325,15 +325,17 @@ export async function updateDefect(id: string, changes: Partial<Defect>): Promis
   });
 }
 
-export async function resolveDefectWithEvidence(id: string, evidencePhotos: Omit<Photo, 'defectId'>[]): Promise<void> {
+export async function resolveDefectWithEvidence(id: string, evidencePhotos: Omit<Photo, 'defectId'>[], changes: Partial<Defect> = {}): Promise<void> {
   if (!evidencePhotos.length) throw new Error('Bitte füge mindestens ein Foto der behobenen Stelle hinzu.');
   await db.transaction('rw', db.defects, db.photos, async () => {
     const defect = await db.defects.get(id);
     if (!defect) throw new Error('Der Mangel wurde nicht gefunden.');
     const praise = 'Gut gemacht – danke für die sorgfältige Behebung und deinen Beitrag zur Sicherheit!';
-    const note = defect.note.includes(praise) ? defect.note : [defect.note.trim(), praise].filter(Boolean).join('\n');
+    const existingNote = changes.note ?? defect.note;
+    const note = existingNote.includes(praise) ? existingNote : [existingNote.trim(), praise].filter(Boolean).join('\n');
     await db.photos.bulkAdd(evidencePhotos.map((photo) => ({ ...photo, defectId: id })));
     await db.defects.update(id, {
+      ...changes,
       status: 'done',
       doneAt: toISODate(new Date()),
       fixed: true,

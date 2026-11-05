@@ -2,13 +2,14 @@ import { CheckCircle, ImageSquare, PencilSimple } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { areaLabel } from '../data/checklist';
 import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT } from '../data/register';
-import { updateDefect } from '../db';
-import { displayWalkNumber, formatDate } from '../lib/dates';
+import { resolveDefectWithEvidence, updateDefect } from '../db';
+import { displayWalkNumber, formatDate, toISODate } from '../lib/dates';
 import { defectDaysOpen, validDefectDue } from '../lib/register';
-import type { Defect, DefectStatus, Walk } from '../lib/types';
+import type { Defect, DefectStatus, Photo, Walk } from '../lib/types';
 import { defectItemLabel } from '../lib/walk';
 import { useRegisterSettings } from './SettingsContext';
 import { Badge, Field } from './ui';
+import { PhotoInput, type PhotoDraft } from './PhotoInput';
 
 export function DefectRow({
   defect,
@@ -31,22 +32,46 @@ export function DefectRow({
   const [fixed, setFixed] = useState(defect.fixed === null ? '' : defect.fixed ? 'yes' : 'no');
   const [newDue, setNewDue] = useState(defect.newDue);
   const [note, setNote] = useState(defect.note);
+  const [resolutionPhotos, setResolutionPhotos] = useState<PhotoDraft[]>([]);
+  const [resolutionError, setResolutionError] = useState('');
+  const [savingFollowup, setSavingFollowup] = useState(false);
   const walkDate = walk?.date ?? defect.createdAt.slice(0, 10);
   const validDue = validDefectDue(walkDate, defect, settings);
   const daysOpen = defectDaysOpen(walkDate, defect);
   const overdue = defect.status !== 'done' && validDue < new Date().toISOString().slice(0, 10);
+  const resolving = status === 'done' || fixed === 'yes';
 
   const saveFollowup = async () => {
+    setSavingFollowup(true);
+    setResolutionError('');
+    try {
+    if (resolving) {
+      if (!resolutionPhotos.length) {
+        setResolutionError('Bitte zuerst mindestens ein Nachher-Foto aufnehmen oder auswählen.');
+        return;
+      }
+      const evidence = resolutionPhotos.map(({ id, blob, width, height, createdAt }): Omit<Photo, 'defectId'> => ({ id, blob, width, height, createdAt }));
+      await resolveDefectWithEvidence(defect.id, evidence, {
+        recheckAt: recheckAt || toISODate(new Date()), controlledBy, newDue: '',
+      });
+      setEditingFollowup(false);
+      return;
+    }
     await updateDefect(defect.id, {
       status,
       recheckAt: recheckAt || null,
       controlledBy,
       fixed: fixed === '' ? null : fixed === 'yes',
       newDue: fixed === 'no' ? newDue : '',
-      doneAt: status === 'done' ? (recheckAt || new Date().toISOString().slice(0, 10)) : defect.doneAt,
+      doneAt: defect.doneAt,
       note,
     });
     setEditingFollowup(false);
+    } catch (error) {
+      setResolutionError((error as Error).message || 'Speichern fehlgeschlagen.');
+    } finally {
+      setSavingFollowup(false);
+    }
   };
 
   return (
@@ -103,11 +128,18 @@ export function DefectRow({
               <option value="">Noch nicht kontrolliert</option><option value="yes">Ja</option><option value="no">Nein</option>
             </select>
           </Field>
+          {resolving && <fieldset className="space-y-2 sm:col-span-2 rounded-lg border border-accent/30 bg-accent-soft/30 p-3">
+            <legend className="label px-1">Behebung dokumentieren</legend>
+            <p className="text-sm text-muted">Bitte fotografiere den behobenen Zustand. Das ursprüngliche Mängelfoto zählt nicht als Nachweis.</p>
+            <PhotoInput photos={resolutionPhotos} onAdd={(added) => { setResolutionPhotos((current) => [...current, ...added]); setResolutionError(''); }} onRemove={(id) => setResolutionPhotos((current) => current.filter((photo) => photo.id !== id))} />
+            <p className="text-sm font-medium text-accent">Nach dem Speichern ergänzen wir automatisch einen Dankessatz zur guten Behebung.</p>
+          </fieldset>}
+          {resolutionError && <p role="alert" className="text-sm text-danger sm:col-span-2" data-testid={`followup-error-${defect.id}`}>{resolutionError}</p>}
           {fixed === 'no' && <Field label="Neuer Termin" htmlFor={`newdue-${defect.id}`}><input id={`newdue-${defect.id}`} type="date" className="field" value={newDue} onChange={(event) => setNewDue(event.target.value)} /></Field>}
           <Field label="Bemerkung" htmlFor={`follow-note-${defect.id}`}><input id={`follow-note-${defect.id}`} className="field" value={note} onChange={(event) => setNote(event.target.value)} /></Field>
           <div className="flex gap-2 sm:col-span-2">
-            <button type="button" className="btn-secondary flex-1" onClick={() => setEditingFollowup(false)}>Abbrechen</button>
-            <button type="button" className="btn-primary flex-1" onClick={() => void saveFollowup()} disabled={fixed === 'no' && !newDue}>Nachkontrolle speichern</button>
+            <button type="button" className="btn-secondary flex-1" onClick={() => setEditingFollowup(false)} disabled={savingFollowup}>Abbrechen</button>
+            <button type="button" className="btn-primary flex-1" onClick={() => void saveFollowup()} disabled={savingFollowup || fixed === 'no' && !newDue || resolving && !resolutionPhotos.length} data-testid={`save-followup-${defect.id}`}>{savingFollowup ? 'Speichert …' : 'Nachkontrolle speichern'}</button>
           </div>
         </div>
       )}

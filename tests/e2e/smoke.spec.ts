@@ -309,3 +309,29 @@ test('Mangelbehebung erfordert ein Nachher-Foto und ergänzt einen Dankessatz', 
   await expect(row.locator('select').first()).toHaveValue('done');
   await expect(row.getByLabel(/Bemerkung/)).toHaveValue(/Gut gemacht – danke für die sorgfältige Behebung/);
 });
+
+test('offenen Punkt aus dem vorherigen Rundgang mit Foto und Dankessatz abschliessen', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('new-walk').click();
+  await page.getByTestId('to-checklist').click();
+  await page.getByTestId('select-area-qps').click();
+  await page.getByTestId('rate-R1@qps-mangel').click();
+  const defectSheet = page.getByRole('dialog');
+  await defectSheet.getByLabel('Beschreibung des Mangels').fill('Fluchtweg zugestellt');
+  await defectSheet.getByLabel('Festgestellte Gefahr').fill('Fluchtweg im Ereignisfall blockiert');
+  await defectSheet.getByTestId('defect-save').click();
+  await expect(defectSheet).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Zur Übersicht' }).click();
+  await page.getByTestId('new-walk').click();
+  const openPoints = page.getByTestId('open-points');
+  await expect(openPoints).toContainText('Fluchtweg zugestellt');
+  const carriedRow = openPoints.locator('[data-testid^="defect-"]').first();
+  await carriedRow.getByRole('button', { name: 'Nachkontrolle aktualisieren' }).click();
+  await carriedRow.getByLabel('Status').selectOption('done');
+  await expect(carriedRow.getByText('Behebung dokumentieren')).toBeVisible();
+  await expect(carriedRow.getByRole('button', { name: 'Nachkontrolle speichern' })).toBeDisabled();
+  await carriedRow.getByTestId('photo-camera').setInputFiles(fixture);
+  await carriedRow.getByRole('button', { name: 'Nachkontrolle speichern' }).click();
+  await expect(page.getByText('Keine offenen Mängel aus früheren Rundgängen.')).toBeVisible();
+});
