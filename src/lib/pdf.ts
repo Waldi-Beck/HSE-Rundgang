@@ -302,7 +302,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   const photoSize = { width: 37, height: 28 };
   const defectRows: RowInput[] = defects.length ? defects.map((defect) => [
     '',
-    `${safePdfDescription(defect.description)}${defect.hazard ? `\nGefahr: ${safePdfDescription(defect.hazard)}` : ''}`,
+    `${safePdfDescription(defect.description)}${defect.hazard ? `\nGefahr: ${safePdfDescription(defect.hazard)}` : ''}${defect.note ? `\nBemerkung: ${safePdfDescription(defect.note)}` : ''}`,
     `${defect.immediateAction ? `Sofortmassnahme: ${defect.immediateAction}\n` : ''}${defect.action || ''}`,
     `${defect.responsible || '–'}\n${PRIORITY_KEY_TO_TEXT[defect.priority]}\n${formatDate(validDefectDue(walk.date, defect, settings))}`,
     '',
@@ -313,7 +313,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     head: [['Nr. / Pkt. / Bereich', 'Beschreibung / Gefahr', 'Sofortmassnahme / Massnahme', 'Verantwortlich / Frist / Prio', 'Foto']],
     body: defectRows,
     rowPageBreak: 'avoid',
-    styles: { ...common.styles, valign: 'top', fontSize: 6.8, minCellHeight: photoSize.height + 3 },
+    styles: { ...common.styles, valign: 'top', fontSize: 6.8, minCellHeight: photoSize.height + 8 },
     headStyles: { ...common.headStyles, fontSize: 6.4 },
     columnStyles: { 0: { cellWidth: 29 }, 1: { cellWidth: 51 }, 2: { cellWidth: 47 }, 3: { cellWidth: 37 }, 4: { cellWidth: contentWidth - 164, halign: 'center' } },
     didDrawCell: (cell) => {
@@ -346,7 +346,12 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
           const scale = Math.min(photoSize.width / firstPhoto.width, photoSize.height / firstPhoto.height);
           const imageWidth = firstPhoto.width * scale;
           const imageHeight = firstPhoto.height * scale;
-          doc.addImage(url, 'JPEG', cell.cell.x + (cell.cell.width - imageWidth) / 2, cell.cell.y + 1, imageWidth, imageHeight, undefined, 'FAST');
+          const caption = firstPhoto.purpose === 'resolution' ? 'Nachher-Foto · behoben' : 'Mängelfoto · vorher';
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(5.2);
+          doc.setTextColor(...(firstPhoto.purpose === 'resolution' ? GREEN : MUTED));
+          doc.text(caption, cell.cell.x + cell.cell.width / 2, cell.cell.y + 3.2, { align: 'center' });
+          doc.addImage(url, 'JPEG', cell.cell.x + (cell.cell.width - imageWidth) / 2, cell.cell.y + 4.5, imageWidth, imageHeight, undefined, 'FAST');
         } else {
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(6);
@@ -373,12 +378,16 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7.5);
         doc.setTextColor(...INK);
-        doc.text(`Weitere Fotos zu ${defect.mangelId}`, MARGIN, y + 2);
+        doc.text(`Weitere Fotos / Behebungsnachweis zu ${defect.mangelId}`, MARGIN, y + 2);
         y += 5;
       }
       const url = photoData.get(photo.id);
-      if (url) doc.addImage(url, 'JPEG', MARGIN, y, imageWidth, imageHeight, undefined, 'FAST');
-      y += imageHeight + 3;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...(photo.purpose === 'resolution' ? GREEN : MUTED));
+      doc.text(photo.purpose === 'resolution' ? `Nachher-Foto · behoben${defect.doneAt ? ` am ${formatDate(defect.doneAt)}` : ''}` : 'Mängelfoto · vorher', MARGIN, y + 2);
+      if (url) doc.addImage(url, 'JPEG', MARGIN, y + 3.5, imageWidth, imageHeight, undefined, 'FAST');
+      y += imageHeight + 6.5;
     }
   }
 

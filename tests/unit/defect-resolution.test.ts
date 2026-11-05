@@ -35,6 +35,7 @@ describe('Behebung mit Foto-Nachweis', () => {
       status: 'done', fixed: true, doneAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       note: expect.stringContaining('Vorheriger Hinweis bleibt erhalten.\nGut gemacht'),
     });
-    expect(await db.photos.where('defectId').equals(defect.id).count()).toBe(1);
+    const savedPhoto = await db.photos.where('defectId').equals(defect.id).first();
+    expect(savedPhoto).toMatchObject({ purpose: 'resolution', width: evidence.width, height: evidence.height });
   });
 });

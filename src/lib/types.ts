@@ -108,6 +108,7 @@ export interface Photo {
   width: number;
   height: number;
   createdAt: string;
+  purpose?: 'resolution';
 }
 
 export interface Inspection {

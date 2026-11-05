@@ -333,7 +333,7 @@ export async function resolveDefectWithEvidence(id: string, evidencePhotos: Omit
     const praise = 'Gut gemacht – danke für die sorgfältige Behebung und deinen Beitrag zur Sicherheit!';
     const existingNote = changes.note ?? defect.note;
     const note = existingNote.includes(praise) ? existingNote : [existingNote.trim(), praise].filter(Boolean).join('\n');
-    await db.photos.bulkAdd(evidencePhotos.map((photo) => ({ ...photo, defectId: id })));
+    await db.photos.bulkAdd(evidencePhotos.map((photo) => ({ ...photo, purpose: 'resolution' as const, defectId: id })));
     await db.defects.update(id, {
       ...changes,
       status: 'done',

@@ -1,5 +1,8 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { jsPDF } from 'jspdf';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { QPS_LOGO_PNG } from '../../src/assets/qpsLogo';
 import { SOP_META } from '../../src/data/checklist';
 import { buildReportPdf, PDF_RESULT_COLORS, pdfResultForWalk, pdfWalkNumber, safePdfDescription } from '../../src/lib/pdf';
@@ -107,6 +110,19 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
     const output = pdf.output();
     expect(output).toContain('Mit KI-Unterst');
     expect(pdf.output()).toContain('Max Muster');
+  });
+
+  it('prints the after-photo label and automatic praise in the defect report', async () => {
+    const praise = 'Gut gemacht – danke für die sorgfältige Behebung und deinen Beitrag zur Sicherheit!';
+    const pdf = await buildReportPdf({
+      walk: { ...walk, status: 'closed', closedAt: '2026-10-06T10:00:00.000Z' },
+      defects: [makeDefect({ status: 'done', fixed: true, doneAt: '2026-10-07', note: praise })],
+      photos: [{ id: 'after-photo', defectId: 'pdf-defect', blob: new Blob([new Uint8Array(readFileSync(path.resolve('tests/fixtures/mangel-fluchtweg.jpg')))], { type: 'image/jpeg' }), width: 1200, height: 900, createdAt: '2026-10-07T10:00:00.000Z', purpose: 'resolution' }],
+      openFromPrevious: [], fileBaseName: 'resolution-photo-test',
+      settings: { id: 'app', areas: ['QLabs'], priorityDays: { K: 0, H: 2, M: 7, N: 30 }, maxIntervalDays: 14 },
+    });
+    expect(pdf.output()).toContain('Nachher-Foto');
+    expect(pdf.output()).toContain('Gut gemacht');
   });
 
   it('druckt QPS-Logo und unveränderte SOP-Dokumenten-ID auf mindestens drei Seiten', async () => {
