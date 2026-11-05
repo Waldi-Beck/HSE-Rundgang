@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { jsPDF } from 'jspdf';
 import { QPS_LOGO_PNG } from '../../src/assets/qpsLogo';
 import { SOP_META } from '../../src/data/checklist';
-import { buildReportPdf, pdfResultForWalk, pdfWalkNumber, safePdfDescription } from '../../src/lib/pdf';
+import { buildReportPdf, PDF_RESULT_COLORS, pdfResultForWalk, pdfWalkNumber, safePdfDescription } from '../../src/lib/pdf';
 import type { Defect, Walk } from '../../src/lib/types';
 
 const walk: Walk = {
@@ -69,6 +69,14 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
     expect(pdfResultForWalk('open', [])).toBe('none');
     expect(pdfResultForWalk('none', [makeDefect({ priority: 'M' })])).toBe('minor');
     expect(pdfResultForWalk('none', [makeDefect({ priority: 'K' })])).toBe('critical');
+  });
+
+  it('uses distinct PDF-form colors for each completion rating', () => {
+    expect(PDF_RESULT_COLORS.none.fill).toEqual([230, 239, 223]);
+    expect(PDF_RESULT_COLORS.minor.fill).toEqual([255, 242, 204]);
+    expect(PDF_RESULT_COLORS.open.fill).toEqual([251, 230, 218]);
+    expect(PDF_RESULT_COLORS.critical.fill).toEqual([248, 224, 225]);
+    expect(PDF_RESULT_COLORS.none.mark).not.toEqual(PDF_RESULT_COLORS.critical.mark);
   });
 
   it('replaces internal placeholders and empty defect descriptions with safe text', async () => {

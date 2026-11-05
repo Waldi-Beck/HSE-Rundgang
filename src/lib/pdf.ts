@@ -17,6 +17,12 @@ const GREEN: [number, number, number] = [31, 105, 65];
 const RED: [number, number, number] = [186, 35, 35];
 const PALE: [number, number, number] = [244, 246, 245];
 const SOFT_RED: [number, number, number] = [255, 242, 241];
+export const PDF_RESULT_COLORS: Record<ResultKey, { fill: [number, number, number]; text: [number, number, number]; mark: [number, number, number]; line: [number, number, number] }> = {
+  none: { fill: [230, 239, 223], text: [49, 81, 43], mark: [105, 139, 92], line: [155, 181, 141] },
+  minor: { fill: [255, 242, 204], text: [114, 85, 10], mark: [179, 139, 33], line: [225, 196, 110] },
+  open: { fill: [251, 230, 218], text: [138, 67, 37], mark: [189, 104, 64], line: [220, 155, 118] },
+  critical: { fill: [248, 224, 225], text: [134, 47, 54], mark: [185, 74, 80], line: [217, 138, 141] },
+};
 const PAGE_TOP = 37;
 const PAGE_BOTTOM = 15;
 
@@ -410,9 +416,20 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     startY: y,
     body: [resultKeys.map((key) => `     ${RESULT_LABELS[key]}`)],
     styles: { ...common.styles, fontSize: 7, fontStyle: 'bold', minCellHeight: 8 },
+    didParseCell: (cell) => {
+      if (cell.section !== 'body' || cell.row.index !== 0) return;
+      const key = resultKeys[cell.column.index];
+      if (!key) return;
+      const colors = PDF_RESULT_COLORS[key];
+      cell.cell.styles.fillColor = colors.fill;
+      cell.cell.styles.textColor = colors.text;
+      cell.cell.styles.lineColor = colors.line;
+    },
     didDrawCell: (cell) => {
       const key = resultKeys[cell.column.index];
-      if (key) checkbox(doc, cell.cell.x + 1.5, cell.cell.y + (cell.cell.height - 3) / 2, pdfResult === key, GREEN);
+      if (cell.section === 'body' && cell.row.index === 0 && key) {
+        checkbox(doc, cell.cell.x + 1.5, cell.cell.y + (cell.cell.height - 3) / 2, pdfResult === key, PDF_RESULT_COLORS[key].mark);
+      }
     },
   });
   y = lastY(doc) + 3;
