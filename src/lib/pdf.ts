@@ -12,10 +12,12 @@ import { cellKey, defectItemLabel } from './walk';
 const MARGIN = 8;
 const INK: [number, number, number] = [38, 43, 47];
 const MUTED: [number, number, number] = [97, 105, 111];
-const LINE: [number, number, number] = [190, 196, 200];
+const BLUE: [number, number, number] = [37, 95, 153];
+const BLUE_DARK: [number, number, number] = [25, 67, 111];
+const BLUE_PALE: [number, number, number] = [232, 239, 246];
+const LINE: [number, number, number] = [183, 193, 202];
 const GREEN: [number, number, number] = [31, 105, 65];
 const RED: [number, number, number] = [186, 35, 35];
-const PALE: [number, number, number] = [244, 246, 245];
 const SOFT_RED: [number, number, number] = [255, 242, 241];
 export const PDF_RESULT_COLORS: Record<ResultKey, { fill: [number, number, number]; text: [number, number, number]; mark: [number, number, number]; line: [number, number, number] }> = {
   none: { fill: [230, 239, 223], text: [49, 81, 43], mark: [105, 139, 92], line: [155, 181, 141] },
@@ -36,7 +38,7 @@ export interface PdfInput {
 }
 
 const lastY = (doc: jsPDF): number => (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? PAGE_TOP;
-const label = (content: string) => ({ content, styles: { fontStyle: 'bold' as const, fillColor: PALE } });
+const label = (content: string) => ({ content, styles: { fontStyle: 'bold' as const, fillColor: BLUE_PALE, textColor: BLUE_DARK } });
 const DESCRIPTION_FALLBACK = 'Beschreibung nicht hinterlegt';
 
 export function pdfWalkNumber(walk: Pick<Walk, 'date'>): string {
@@ -107,7 +109,7 @@ function drawHeader(doc: jsPDF, walk: Walk, page: number, pageCount: number, fil
   const y = 10.5;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.6);
-  doc.setTextColor(25, 45, 72);
+  doc.setTextColor(...BLUE_DARK);
   doc.text(`Dokumenten ID: ${SOP_META.docId}`, MARGIN, y);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...INK);
@@ -120,8 +122,8 @@ function drawHeader(doc: jsPDF, walk: Walk, page: number, pageCount: number, fil
   doc.text(`Rundgang-Nr.: ${pdfWalkNumber(walk)}`, MARGIN, y + 8.6);
   doc.setFontSize(6.2);
   doc.text(`Status: ${status}`, width - MARGIN - logoW - 4, y + 8.6, { align: 'right' });
-  doc.setDrawColor(...LINE);
-  doc.setLineWidth(0.25);
+  doc.setDrawColor(...BLUE);
+  doc.setLineWidth(0.45);
   doc.line(MARGIN, 27, width - MARGIN, 27);
 
   doc.setFont('helvetica', 'normal');
@@ -145,13 +147,13 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     margin: { left: MARGIN, right: MARGIN, top: PAGE_TOP, bottom: PAGE_BOTTOM },
     theme: 'grid' as const,
     styles: { font: 'helvetica', fontSize: 7.2, cellPadding: 1.05, textColor: INK, lineColor: LINE, lineWidth: 0.16, valign: 'middle' as const },
-    headStyles: { fillColor: PALE, textColor: INK, fontStyle: 'bold' as const, halign: 'center' as const },
+    headStyles: { fillColor: BLUE_PALE, textColor: BLUE_DARK, fontStyle: 'bold' as const, halign: 'center' as const },
   };
   let y = PAGE_TOP;
   const sectionTitle = (text: string, size = 10) => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(size);
-    doc.setTextColor(...INK);
+    doc.setTextColor(...BLUE);
     doc.text(text, MARGIN, y + size * 0.35);
     y += size * 0.72;
   };
@@ -159,7 +161,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   // Page 1: form title, round data, legend, 2.1 matrix and optional 2.2 table.
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(17);
-  doc.setTextColor(...INK);
+  doc.setTextColor(...BLUE);
   doc.text(FORM_TITLE, MARGIN, y + 6);
   y += 9;
   doc.setFontSize(6.8);
