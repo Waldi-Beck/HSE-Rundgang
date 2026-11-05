@@ -13,6 +13,13 @@ import { AutoField } from '../../components/AutoField';
 import { SignaturePad } from '../../components/SignaturePad';
 import { Badge, Field, useToast } from '../../components/ui';
 
+const RESULT_STYLES: Record<ResultKey, { card: string; indicator: string }> = {
+  none: { card: 'border-[#9bb58d] bg-[#e6efdf] text-[#31512b]', indicator: 'border-[#698b5c] bg-[#698b5c] text-white' },
+  minor: { card: 'border-[#e1c46e] bg-[#fff2cc] text-[#72550a]', indicator: 'border-[#b38b21] bg-[#b38b21] text-white' },
+  open: { card: 'border-[#dc9b76] bg-[#fbe6da] text-[#8a4325]', indicator: 'border-[#bd6840] bg-[#bd6840] text-white' },
+  critical: { card: 'border-[#d98a8d] bg-[#f8e0e1] text-[#862f36]', indicator: 'border-[#b94a50] bg-[#b94a50] text-white' },
+};
+
 function SignatureBlock({ title, sig, walk, onSave, testId }: { title: string; sig: Signature; walk: Walk; onSave: (signature: Signature) => void; testId: string }) {
   const readOnly = walk.status === 'closed';
   return (
@@ -92,11 +99,12 @@ export function CloseTab({ walk, defects }: { walk: Walk; defects: Defect[] }) {
         <p className="mt-1 text-sm text-muted">{counts.checked} von {counts.total} Feldern bewertet · {defects.length} Mängel · {defects.filter((defect) => defect.priority === 'K').length} kritisch.</p>
         <fieldset className="mt-4">
           <legend className="label">Gesamtbewertung</legend>
-          <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Gesamtbewertung">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="Gesamtbewertung">
             {(Object.keys(RESULT_LABELS) as ResultKey[]).map((key) => {
               const active = walk.result === key;
-              return <button key={key} type="button" role="radio" aria-checked={active} disabled={readOnly} onClick={() => void updateWalk(walk.id, { result: key })} className={`flex min-h-14 items-center gap-3 rounded-lg border px-3 text-left font-medium ${active ? 'border-accent bg-accent-soft' : 'border-line-strong bg-surface'}`}>
-                <span className={`grid h-6 w-6 shrink-0 place-items-center rounded border ${active ? 'border-accent bg-accent text-white' : 'border-line-strong'}`}>{active && <Check size={16} weight="bold" aria-hidden />}</span>
+              const style = RESULT_STYLES[key];
+              return <button key={key} type="button" role="radio" aria-checked={active} disabled={readOnly} onClick={() => void updateWalk(walk.id, { result: key })} data-testid={`result-card-${key}`} className={`flex min-h-14 items-center gap-3 rounded-lg border px-3 text-left font-medium transition-shadow disabled:cursor-not-allowed disabled:opacity-75 ${style.card} ${active ? 'border-2 shadow-sm' : ''}`}>
+                <span className={`grid h-6 w-6 shrink-0 place-items-center rounded border ${active ? style.indicator : 'border-current bg-white/70'}`}>{active && <Check size={16} weight="bold" aria-hidden />}</span>
                 <span>{RESULT_LABELS[key]}</span>
                 {key === proposal && !readOnly && <Badge tone="neutral">Vorschlag</Badge>}
               </button>;

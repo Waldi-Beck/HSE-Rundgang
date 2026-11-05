@@ -179,9 +179,14 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
   await expect(page.getByRole('heading', { name: '3. Abschluss' })).toBeVisible();
   await expect(page.getByText(/3 Mängel/)).toBeVisible();
   await expect(page.getByTestId('share-pdf')).toBeVisible();
+  await expect(page.getByTestId('result-card-none')).toHaveClass(/bg-\[#e6efdf\]/);
+  await expect(page.getByTestId('result-card-minor')).toHaveClass(/bg-\[#fff2cc\]/);
+  await expect(page.getByTestId('result-card-open')).toHaveClass(/bg-\[#fbe6da\]/);
+  await expect(page.getByTestId('result-card-critical')).toHaveClass(/bg-\[#f8e0e1\]/);
   await page.getByTestId('close-walk').click();
   await expect(page.getByTestId('close-errors')).toContainText('Unterschrift');
   await page.getByRole('radio', { name: /offenen Massnahmen/i }).click();
+  await expect(page.getByTestId('result-card-open')).toHaveAttribute('aria-checked', 'true');
   await sign(page);
   await page.getByTestId('close-walk').click();
   await expect(page.getByText(/Abgeschlossen am/)).toBeVisible();
