@@ -282,3 +282,30 @@ test('einzelnen Rundgang samt Bestätigungsdialog löschen', async ({ page }) =>
   await expect(page.getByText(docNr!, { exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Noch kein Rundgang erfasst' })).toBeVisible();
 });
+
+test('Mangelbehebung erfordert ein Nachher-Foto und ergänzt einen Dankessatz', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('new-walk').click();
+  await page.getByTestId('to-checklist').click();
+  await page.getByTestId('select-area-qps').click();
+  await page.getByTestId('rate-R1@qps-mangel').click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByLabel('Beschreibung des Mangels').fill('Fluchtweg zugestellt');
+  await sheet.getByLabel('Festgestellte Gefahr').fill('Fluchtweg nicht frei');
+  await sheet.getByTestId('defect-save').click();
+  await expect(sheet).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Register', exact: true }).click();
+  await page.getByRole('tab', { name: 'Mängel' }).click();
+  const row = page.locator('[data-testid^="defect-"]').first();
+  await row.locator('select').first().selectOption('done');
+  const evidenceDialog = page.getByTestId('defect-resolution-dialog');
+  await expect(evidenceDialog).toBeVisible();
+  await expect(evidenceDialog.getByTestId('confirm-defect-resolution')).toBeDisabled();
+  await evidenceDialog.getByTestId('photo-camera').setInputFiles(fixture);
+  await expect(evidenceDialog.getByTestId('confirm-defect-resolution')).toBeEnabled();
+  await evidenceDialog.getByTestId('confirm-defect-resolution').click();
+  await expect(evidenceDialog).toHaveCount(0);
+  await expect(row.locator('select').first()).toHaveValue('done');
+  await expect(row.getByLabel(/Bemerkung/)).toHaveValue(/Gut gemacht – danke für die sorgfältige Behebung/);
+});

@@ -1,17 +1,19 @@
 import { DownloadSimple } from '@phosphor-icons/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router';
 import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../data/register';
 import { areaLabel } from '../data/checklist';
-import { db, updateDefect } from '../db';
+import { db, resolveDefectWithEvidence, updateDefect } from '../db';
 import { exportRegisterXlsx } from '../export';
 import { displayWalkNumber, formatDate, toISODate } from '../lib/dates';
 import { defectDaysOpen, roundRegisterRows, validDefectDue } from '../lib/register';
 import { defectItemLabel } from '../lib/walk';
-import type { Defect, DefectStatus, Walk } from '../lib/types';
+import type { Defect, DefectStatus, Photo, Walk } from '../lib/types';
 import { EmptyState, useToast } from '../components/ui';
 import { useRegisterSettings } from '../components/SettingsContext';
+import { PhotoInput, type PhotoDraft } from '../components/PhotoInput';
 
 const VIEWS = [
   { id: 'rundgaenge', label: 'Rundgänge' },
@@ -85,17 +87,82 @@ function DefectsRegister({ walks, defects }: { walks: Walk[]; defects: Defect[] 
 
 function DefectRegisterRow({ defect, walk }: { defect: Defect; walk?: Walk }) {
   const settings = useRegisterSettings();
+  const toast = useToast();
+  const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const baseDate = walk?.date ?? defect.createdAt.slice(0, 10);
   const validDue = validDefectDue(baseDate, defect, settings);
   const daysOpen = defectDaysOpen(baseDate, defect);
   const overdue = defect.status !== 'done' && validDue < toISODate(new Date());
   const patch = (changes: Partial<Defect>) => void updateDefect(defect.id, changes);
-  return <tr className={overdue ? 'bg-danger-soft/45' : ''} data-testid={`defect-${defect.id}`}>
+  const changeStatus = (status: DefectStatus) => {
+    if (status === 'done' && defect.status !== 'done') {
+      setResolveDialogOpen(true);
+      return;
+    }
+    patch({ status, doneAt: status === 'done' ? defect.doneAt || toISODate(new Date()) : defect.doneAt });
+  };
+  const changeFixed = (value: string) => {
+    if (value === 'yes' && defect.status !== 'done') {
+      setResolveDialogOpen(true);
+      return;
+    }
+    patch({ fixed: value === '' ? null : value === 'yes', status: value === 'no' ? 'recheck' : defect.status });
+  };
+  return <>
+  <tr className={overdue ? 'bg-danger-soft/45' : ''} data-testid={`defect-${defect.id}`}>
     <td className="px-3 py-2 font-medium">{defect.mangelId}</td><td className="px-3 py-2 whitespace-nowrap">{formatDate(baseDate)}</td><td className="px-3 py-2">{walk ? `${walk.isoYear}-KW${String(walk.week).padStart(2, '0')}` : '–'}</td><td className="px-3 py-2">{defect.nr}</td><td className="px-3 py-2">{areaLabel(defect.area, settings.areas)}</td><td className="px-3 py-2">{defectItemLabel(defect.itemId)}</td><td className="px-3 py-2">{defect.description}</td><td className="px-3 py-2">{defect.hazard}</td><td className="px-3 py-2">{PRIORITY_KEY_TO_TEXT[defect.priority]}</td><td className="px-3 py-2">{defect.aiAudit?.used ? defect.aiAudit.reviewedAt ? `Ja — ${formatDate(defect.aiAudit.reviewedAt)} durch ${defect.aiAudit.reviewedBy || walk?.inspector || 'nicht angegeben'} geprüft` : 'KI genutzt — Prüfung offen' : 'Nein'}</td><td className="px-3 py-2">{defect.immediateAction}</td><td className="px-3 py-2">{defect.action}</td><td className="px-3 py-2">{defect.responsible}</td><td className="px-3 py-2">{formatDate(defect.due)}</td>
-    <td className="min-w-52 px-3 py-2"><select className="field min-w-48 py-1.5 text-xs" value={defect.status} onChange={(event) => patch({ status: event.target.value as DefectStatus, doneAt: event.target.value === 'done' ? toISODate(new Date()) : defect.doneAt })}>{Object.entries(DEFECT_STATUS_LABELS).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select></td>
+    <td className="min-w-52 px-3 py-2"><select className="field min-w-48 py-1.5 text-xs" value={defect.status} onChange={(event) => changeStatus(event.target.value as DefectStatus)}>{Object.entries(DEFECT_STATUS_LABELS).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select></td>
     <td className="px-3 py-2">{formatDate(defect.doneAt)}</td><td className="px-3 py-2"><input aria-label={`Nachkontrolle am ${defect.mangelId}`} className="field min-w-32 py-1.5 text-xs" type="date" value={defect.recheckAt ?? ''} onChange={(event) => patch({ recheckAt: event.target.value || null })} /></td><td className="px-3 py-2"><input aria-label={`Kontrolliert von ${defect.mangelId}`} className="field min-w-36 py-1.5 text-xs" value={defect.controlledBy} onChange={(event) => patch({ controlledBy: event.target.value })} /></td>
-    <td className="px-3 py-2"><select aria-label={`Mangel behoben ${defect.mangelId}`} className="field min-w-28 py-1.5 text-xs" value={defect.fixed === null ? '' : defect.fixed ? 'yes' : 'no'} onChange={(event) => patch({ fixed: event.target.value === '' ? null : event.target.value === 'yes', status: event.target.value === 'no' ? 'recheck' : defect.status })}><option value="">–</option><option value="yes">Ja</option><option value="no">Nein</option></select></td>
+    <td className="px-3 py-2"><select aria-label={`Mangel behoben ${defect.mangelId}`} className="field min-w-28 py-1.5 text-xs" value={defect.fixed === null ? '' : defect.fixed ? 'yes' : 'no'} onChange={(event) => changeFixed(event.target.value)}><option value="">–</option><option value="yes">Ja</option><option value="no">Nein</option></select></td>
     <td className="px-3 py-2"><input aria-label={`Neuer Termin ${defect.mangelId}`} className="field min-w-32 py-1.5 text-xs" type="date" value={defect.newDue} onChange={(event) => patch({ newDue: event.target.value })} /></td><td className={`px-3 py-2 whitespace-nowrap ${overdue ? 'font-semibold text-danger' : ''}`}>{formatDate(validDue)}</td><td className="px-3 py-2">{daysOpen}</td><td className={`px-3 py-2 ${overdue ? 'font-bold text-danger' : ''}`}>{overdue ? 'ÜBERFÄLLIG' : ''}</td><td className="px-3 py-2"><input aria-label={`Bemerkung ${defect.mangelId}`} className="field min-w-44 py-1.5 text-xs" value={defect.note} onChange={(event) => patch({ note: event.target.value })} /></td>
-  </tr>;
+  </tr>
+  {resolveDialogOpen && <DefectResolutionDialog defect={defect} onCancel={() => setResolveDialogOpen(false)} onCompleted={() => {
+    setResolveDialogOpen(false);
+    toast('Mangel als behoben erfasst – Foto und Dankessatz wurden gespeichert.');
+  }} />}
+  </>;
+}
+
+function DefectResolutionDialog({ defect, onCancel, onCompleted }: { defect: Defect; onCancel: () => void; onCompleted: () => void }) {
+  const [photos, setPhotos] = useState<PhotoDraft[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const saveResolution = async () => {
+    if (!photos.length) {
+      setError('Bitte zuerst mindestens ein Nachher-Foto aufnehmen oder auswählen.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const evidence = photos.map(({ id, blob, width, height, createdAt }): Omit<Photo, 'defectId'> => ({ id, blob, width, height, createdAt }));
+      await resolveDefectWithEvidence(defect.id, evidence);
+      onCompleted();
+    } catch (cause) {
+      setError((cause as Error).message || 'Speichern fehlgeschlagen.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return createPortal(<div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4" role="presentation">
+    <section role="dialog" aria-modal="true" aria-labelledby="resolution-title" className="max-h-[90dvh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl border border-line bg-surface p-5 shadow-xl" data-testid="defect-resolution-dialog">
+      <div>
+        <h2 id="resolution-title" className="text-lg font-semibold">Behebung dokumentieren</h2>
+        <p className="mt-1 text-sm text-muted">Mangel {defect.mangelId}: Bitte fotografiere den behobenen Zustand. Das ursprüngliche Mängelfoto zählt nicht als Nachweis.</p>
+      </div>
+      <fieldset>
+        <legend className="label">Nachher-Foto (erforderlich)</legend>
+        <PhotoInput photos={photos} onAdd={(added) => setPhotos((current) => [...current, ...added])} onRemove={(id) => setPhotos((current) => current.filter((photo) => photo.id !== id))} />
+      </fieldset>
+      <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-ink">Nach dem Speichern wird automatisch ergänzt: „Gut gemacht – danke für die sorgfältige Behebung und deinen Beitrag zur Sicherheit!“</p>
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      <div className="flex gap-2">
+        <button type="button" className="btn-secondary flex-1" onClick={onCancel} disabled={saving}>Abbrechen</button>
+        <button type="button" className="btn-primary flex-1" onClick={() => void saveResolution()} disabled={saving || photos.length === 0} data-testid="confirm-defect-resolution">{saving ? 'Speichert …' : 'Foto speichern & als behoben markieren'}</button>
+      </div>
+    </section>
+  </div>, document.body);
 }
 
