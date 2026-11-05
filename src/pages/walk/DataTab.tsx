@@ -76,7 +76,7 @@ export function DataTab({ walk }: { walk: Walk }) {
         ) : openPoints.length ? (
           <ul className="divide-y divide-line border-t border-line" data-testid="open-points">
             {openPoints.map(({ defect, walk: source }) => (
-              <DefectRow key={defect.id} defect={defect} walk={source} photoCount={photoCounts?.[defect.id]} showOrigin />
+              <DefectRow key={defect.id} defect={defect} walk={source} resolutionWalkId={walk.id} photoCount={photoCounts?.[defect.id]} showOrigin />
             ))}
           </ul>
         ) : (

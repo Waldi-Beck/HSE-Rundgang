@@ -334,4 +334,13 @@ test('offenen Punkt aus dem vorherigen Rundgang mit Foto und Dankessatz abschlie
   await carriedRow.getByTestId('photo-camera').setInputFiles(fixture);
   await carriedRow.getByRole('button', { name: 'Nachkontrolle speichern' }).click();
   await expect(page.getByText('Keine offenen Mängel aus früheren Rundgängen.')).toBeVisible();
+
+  await page.getByRole('link', { name: '3. Abschluss' }).click();
+  const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-pdf').click()]);
+  const pdfPath = test.info().outputPath(pdf.suggestedFilename());
+  await pdf.saveAs(pdfPath);
+  const pdfText = readFileSync(pdfPath, 'latin1');
+  expect(pdfText).toContain('Behobene Mängel aus vorherigen Rundgängen');
+  expect(pdfText).toContain('Nachher-Foto');
+  expect(pdfText).toContain('Gut gemacht');
 });

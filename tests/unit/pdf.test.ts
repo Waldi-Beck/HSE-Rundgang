@@ -114,15 +114,19 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
 
   it('prints the after-photo label and automatic praise in the defect report', async () => {
     const praise = 'Gut gemacht – danke für die sorgfältige Behebung und deinen Beitrag zur Sicherheit!';
+    const previousWalk = { ...walk, id: 'previous-walk', date: '2026-10-01', status: 'closed' as const };
+    const completedDefect = makeDefect({ walkId: previousWalk.id, status: 'done', fixed: true, doneAt: '2026-10-07', note: praise });
     const pdf = await buildReportPdf({
-      walk: { ...walk, status: 'closed', closedAt: '2026-10-06T10:00:00.000Z' },
-      defects: [makeDefect({ status: 'done', fixed: true, doneAt: '2026-10-07', note: praise })],
+      walk: { ...walk, id: 'new-walk', docNr: 'HSE-RG-2026-002', status: 'closed', result: 'none', closedAt: '2026-10-07T10:00:00.000Z' },
+      defects: [], openFromPrevious: [], resolvedFromPrevious: [{ defect: completedDefect, walk: previousWalk }],
       photos: [{ id: 'after-photo', defectId: 'pdf-defect', blob: new Blob([new Uint8Array(readFileSync(path.resolve('tests/fixtures/mangel-fluchtweg.jpg')))], { type: 'image/jpeg' }), width: 1200, height: 900, createdAt: '2026-10-07T10:00:00.000Z', purpose: 'resolution' }],
-      openFromPrevious: [], fileBaseName: 'resolution-photo-test',
+      fileBaseName: 'resolution-photo-test',
       settings: { id: 'app', areas: ['QLabs'], priorityDays: { K: 0, H: 2, M: 7, N: 30 }, maxIntervalDays: 14 },
     });
     expect(pdf.output()).toContain('Nachher-Foto');
     expect(pdf.output()).toContain('Gut gemacht');
+    expect(pdf.output()).toContain('Behobene Mängel aus vorherigen Rundgängen');
+    expect(pdf.output()).toContain('HSE-RG_2026_10_01');
   });
 
   it('druckt QPS-Logo und unveränderte SOP-Dokumenten-ID auf mindestens drei Seiten', async () => {

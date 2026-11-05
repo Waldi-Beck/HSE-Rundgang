@@ -14,12 +14,14 @@ import { PhotoInput, type PhotoDraft } from './PhotoInput';
 export function DefectRow({
   defect,
   walk,
+  resolutionWalkId,
   photoCount,
   onOpen,
   showOrigin = true,
 }: {
   defect: Defect;
   walk?: Walk;
+  resolutionWalkId?: string;
   photoCount?: number;
   onOpen?: () => void;
   showOrigin?: boolean;
@@ -52,7 +54,7 @@ export function DefectRow({
       }
       const evidence = resolutionPhotos.map(({ id, blob, width, height, createdAt }): Omit<Photo, 'defectId'> => ({ id, blob, width, height, createdAt }));
       await resolveDefectWithEvidence(defect.id, evidence, {
-        recheckAt: recheckAt || toISODate(new Date()), controlledBy, newDue: '',
+        recheckAt: recheckAt || toISODate(new Date()), controlledBy, newDue: '', resolvedInWalkId: resolutionWalkId ?? null,
       });
       setEditingFollowup(false);
       return;

@@ -15,13 +15,18 @@ async function createWalkPdf(walkId: string): Promise<{ filename: string; blob: 
   const walk = await db.walks.get(walkId);
   if (!walk) throw new Error('Rundgang nicht gefunden.');
   const defects = (await db.defects.where('walkId').equals(walkId).toArray()).sort((a, b) => a.nr - b.nr);
-  const photos = await db.photos.where('defectId').anyOf(defects.map((defect) => defect.id)).toArray();
+  const resolvedDefects = (await db.defects.toArray()).filter((defect) => defect.resolvedInWalkId === walkId);
+  const allWalks = resolvedDefects.length ? await db.walks.toArray() : [];
+  const walksById = new Map(allWalks.map((item) => [item.id, item]));
+  const resolvedFromPrevious = resolvedDefects.map((defect) => ({ defect, walk: walksById.get(defect.walkId) }));
+  const photoDefectIds = [...new Set([...defects, ...resolvedDefects].map((defect) => defect.id))];
+  const photos = photoDefectIds.length ? await db.photos.where('defectId').anyOf(photoDefectIds).toArray() : [];
   photos.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const openFromPrevious = await openDefectsBefore(walk);
   const fileBaseName = await reportFileBase(walk);
   const { buildReportPdf } = await import('./lib/pdf');
   const [settings] = await Promise.all([db.settings.get('app')]);
-  const pdf = await buildReportPdf({ walk, defects, photos, openFromPrevious, fileBaseName, settings: settings ?? DEFAULT_REGISTER_SETTINGS });
+  const pdf = await buildReportPdf({ walk, defects, photos, openFromPrevious, resolvedFromPrevious, fileBaseName, settings: settings ?? DEFAULT_REGISTER_SETTINGS });
   const filename = `${fileBaseName}.pdf`;
   return { filename, blob: pdf.output('blob') };
 }

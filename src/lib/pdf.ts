@@ -33,6 +33,7 @@ export interface PdfInput {
   defects: Defect[];
   photos: Photo[];
   openFromPrevious: { defect: Defect; walk?: Walk }[];
+  resolvedFromPrevious?: { defect: Defect; walk?: Walk }[];
   fileBaseName: string;
   settings: RegisterSettings;
 }
@@ -134,7 +135,7 @@ function drawHeader(doc: jsPDF, walk: Walk, page: number, pageCount: number, fil
 }
 
 export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
-  const { walk, defects, photos, openFromPrevious, fileBaseName, settings } = input;
+  const { walk, defects, photos, openFromPrevious, resolvedFromPrevious = [], fileBaseName, settings } = input;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const width = doc.internal.pageSize.getWidth();
   const height = doc.internal.pageSize.getHeight();
@@ -413,6 +414,56 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     },
   });
   y = lastY(doc) + 4;
+
+  if (resolvedFromPrevious.length) {
+    sectionTitle(`Behobene Mängel aus vorherigen Rundgängen (${resolvedFromPrevious.length})`);
+    const resolvedRows: RowInput[] = resolvedFromPrevious.map(({ defect, walk: source }) => {
+      const afterPhotos = photosFor(defect.id).filter((photo) => photo.purpose === 'resolution');
+      return [
+        source ? displayWalkNumber(source.date) : 'nicht hinterlegt',
+        `M${String(defect.nr).padStart(2, '0')}`,
+        `${defectItemLabel(defect.itemId)} / ${areaLabel(defect.area, settings.areas)}`,
+        safePdfDescription(defect.description),
+        formatDate(defect.doneAt || defect.recheckAt),
+        afterPhotos.length ? `${afterPhotos.length} Nachher-Foto(s)` : 'Kein Nachher-Foto hinterlegt',
+        defect.note ? safePdfDescription(defect.note) : '–',
+      ];
+    });
+    autoTable(doc, {
+      ...common,
+      startY: y + 1,
+      head: [['Ursprünglicher Rundgang', 'Mangel-Nr.', 'Kontrollpunkt / Bereich', 'Behobener Mangel', 'Behoben am', 'Fotobeweis', 'Bemerkung / Rückmeldung']],
+      body: resolvedRows,
+      rowPageBreak: 'avoid',
+      styles: { ...common.styles, fontSize: 6.2, cellPadding: 0.8, valign: 'top' },
+      headStyles: { ...common.headStyles, fontSize: 6 },
+      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 14 }, 2: { cellWidth: 30 }, 3: { cellWidth: 43 }, 4: { cellWidth: 18 }, 5: { cellWidth: 23 }, 6: { cellWidth: contentWidth - 153 } },
+    });
+    y = lastY(doc) + 3;
+
+    for (const { defect } of resolvedFromPrevious) {
+      const evidence = photosFor(defect.id).filter((photo) => photo.purpose === 'resolution');
+      if (!evidence.length) continue;
+      for (const [index, photo] of evidence.entries()) {
+        const imageW = Math.min(contentWidth / 2 - 4, 70);
+        const scale = Math.min(imageW / photo.width, 50 / photo.height);
+        const imageWidth = photo.width * scale;
+        const imageHeight = photo.height * scale;
+        if (y + imageHeight + 12 > height - PAGE_BOTTOM) {
+          doc.addPage();
+          y = PAGE_TOP;
+        }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(...GREEN);
+        doc.text(`Nachher-Foto zu ${defect.mangelId}${evidence.length > 1 ? ` (${index + 1}/${evidence.length})` : ''} · behoben am ${formatDate(defect.doneAt || defect.recheckAt)}`, MARGIN, y + 2);
+        const url = photoData.get(photo.id);
+        if (url) doc.addImage(url, 'JPEG', MARGIN, y + 4, imageWidth, imageHeight, undefined, 'FAST');
+        y += imageHeight + 7;
+      }
+    }
+    y += 2;
+  }
 
   if (y + 55 > height - PAGE_BOTTOM) {
     doc.addPage();

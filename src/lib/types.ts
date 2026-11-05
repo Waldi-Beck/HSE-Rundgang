@@ -96,6 +96,8 @@ export interface Defect {
   fixed: boolean | null;
   newDue: string;
   note: string;
+  /** Current round in which a previously recorded defect was verified as resolved. */
+  resolvedInWalkId?: string | null;
   aiAudit?: AiAudit | null;
   createdAt: string;
   updatedAt: string;
