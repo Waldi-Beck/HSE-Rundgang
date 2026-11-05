@@ -10,7 +10,7 @@ import { exportRegisterXlsx } from '../export';
 import { displayWalkNumber, formatDate, toISODate } from '../lib/dates';
 import { defectDaysOpen, roundRegisterRows, validDefectDue } from '../lib/register';
 import { defectItemLabel } from '../lib/walk';
-import type { Defect, DefectStatus, Photo, Walk } from '../lib/types';
+import type { Defect, DefectResolution, DefectStatus, Photo, Walk } from '../lib/types';
 import { EmptyState, useToast } from '../components/ui';
 import { useRegisterSettings } from '../components/SettingsContext';
 import { PhotoInput, type PhotoDraft } from '../components/PhotoInput';
@@ -29,7 +29,8 @@ export function RegisterPage() {
   const settings = useRegisterSettings();
   const walks = useLiveQuery(() => db.walks.toArray());
   const defects = useLiveQuery(() => db.defects.toArray());
-  const ready = !!walks && !!defects;
+  const resolutions = useLiveQuery(() => db.resolutions.toArray());
+  const ready = !!walks && !!defects && !!resolutions;
   const rows = ready ? roundRegisterRows(walks, defects, settings).slice().reverse() : [];
 
   useEffect(() => {
@@ -53,7 +54,7 @@ export function RegisterPage() {
         {VIEWS.map((item) => <button key={item.id} role="tab" aria-selected={view === item.id} type="button" onClick={() => chooseView(item.id)} className={`min-h-11 rounded-md px-2 text-sm font-medium ${view === item.id ? 'bg-ink text-bg' : 'text-muted'}`}>{item.label}</button>)}
       </div>
 
-      {!ready ? <div className="h-40 animate-pulse rounded-xl bg-surface" aria-label="Register wird geladen" /> : view === 'rundgaenge' ? <RoundsRegister rows={rows} /> : <DefectsRegister walks={walks} defects={defects} />}
+      {!ready ? <div className="h-40 animate-pulse rounded-xl bg-surface" aria-label="Register wird geladen" /> : view === 'rundgaenge' ? <RoundsRegister rows={rows} /> : <DefectsRegister walks={walks} defects={defects} resolutions={resolutions} />}
     </div>
   );
 }
@@ -72,27 +73,36 @@ function RoundsRegister({ rows }: { rows: ReturnType<typeof roundRegisterRows> }
   </tbody></table></div>;
 }
 
-function DefectsRegister({ walks, defects }: { walks: Walk[]; defects: Defect[] }) {
+function DefectsRegister({ walks, defects, resolutions }: { walks: Walk[]; defects: Defect[]; resolutions: DefectResolution[] }) {
   const [filter, setFilter] = useState('all');
   const byWalk = new Map(walks.map((walk) => [walk.id, walk]));
-  const visible = defects.filter((defect) => filter === 'all' || defect.status === filter).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.nr - b.nr);
+  const latestResolution = new Map<string, DefectResolution>();
+  for (const resolution of resolutions) {
+    const previous = latestResolution.get(resolution.defectId);
+    if (!previous || resolution.resolvedAt > previous.resolvedAt) latestResolution.set(resolution.defectId, resolution);
+  }
+  const visible = defects.filter((defect) => filter === 'all' || (latestResolution.has(defect.id) ? filter === 'done' : defect.status === filter)).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.nr - b.nr);
   if (!defects.length) return <EmptyState title="Noch keine Mängel">Mängel aus der Checkliste erscheinen hier mit gültiger Frist und Nachkontrolle.</EmptyState>;
   return <div className="space-y-3">
     <div className="flex flex-wrap gap-2" aria-label="Mängelfilter">{[['all', 'Alle'], ['open', 'Offen'], ['inProgress', 'In Bearbeitung'], ['recheck', 'Nachkontrolle'], ['done', 'Erledigt']].map(([id, label]) => <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)} className={`min-h-10 rounded-lg border px-3 text-sm ${filter === id ? 'border-accent bg-accent-soft' : 'border-line-strong bg-surface'}`}>{label}</button>)}</div>
     <div className="overflow-x-auto rounded-xl border border-line bg-surface"><table className="min-w-[2600px] border-collapse text-left text-xs"><thead className="bg-surface-2"><tr>{['Mangel-ID', 'Datum', 'KW', 'Nr. im Formular', 'Bereich', 'Kontrollpunkt', 'Beschreibung des Mangels', 'Festgestellte Gefahr', 'Priorität', 'KI-Unterstützung', 'Sofortmassnahme', 'Massnahme', 'Verantwortlich', 'Frist', 'Status', 'Erledigt am', 'Nachkontrolle am', 'Kontrolliert von', 'Mangel behoben?', 'Neuer Termin (bei Nein)', 'Gültige Frist', 'Tage offen', 'Überfällig', 'Bemerkung'].map((title) => <th key={title} className="border-b border-line px-3 py-3 font-semibold">{title}</th>)}</tr></thead><tbody className="divide-y divide-line">
-    {visible.map((defect) => <DefectRegisterRow key={defect.id} defect={defect} walk={byWalk.get(defect.walkId)} />)}
+    {visible.map((defect) => <DefectRegisterRow key={defect.id} defect={defect} walk={byWalk.get(defect.walkId)} resolution={latestResolution.get(defect.id)} />)}
     </tbody></table></div>
   </div>;
 }
 
-function DefectRegisterRow({ defect, walk }: { defect: Defect; walk?: Walk }) {
+function DefectRegisterRow({ defect, walk, resolution }: { defect: Defect; walk?: Walk; resolution?: DefectResolution }) {
   const settings = useRegisterSettings();
   const toast = useToast();
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const baseDate = walk?.date ?? defect.createdAt.slice(0, 10);
   const validDue = validDefectDue(baseDate, defect, settings);
   const daysOpen = defectDaysOpen(baseDate, defect);
-  const overdue = defect.status !== 'done' && validDue < toISODate(new Date());
+  const effectiveStatus: DefectStatus = resolution ? 'done' : defect.status;
+  const effectiveDoneAt = resolution?.resolvedAt.slice(0, 10) ?? defect.doneAt;
+  const effectiveFixed = resolution ? true : defect.fixed;
+  const effectiveNote = resolution?.note ?? defect.note;
+  const overdue = effectiveStatus !== 'done' && validDue < toISODate(new Date());
   const patch = (changes: Partial<Defect>) => void updateDefect(defect.id, changes);
   const changeStatus = (status: DefectStatus) => {
     if (status === 'done' && defect.status !== 'done') {
@@ -111,10 +121,10 @@ function DefectRegisterRow({ defect, walk }: { defect: Defect; walk?: Walk }) {
   return <>
   <tr className={overdue ? 'bg-danger-soft/45' : ''} data-testid={`defect-${defect.id}`}>
     <td className="px-3 py-2 font-medium">{defect.mangelId}</td><td className="px-3 py-2 whitespace-nowrap">{formatDate(baseDate)}</td><td className="px-3 py-2">{walk ? `${walk.isoYear}-KW${String(walk.week).padStart(2, '0')}` : '–'}</td><td className="px-3 py-2">{defect.nr}</td><td className="px-3 py-2">{areaLabel(defect.area, settings.areas)}</td><td className="px-3 py-2">{defectItemLabel(defect.itemId)}</td><td className="px-3 py-2">{defect.description}</td><td className="px-3 py-2">{defect.hazard}</td><td className="px-3 py-2">{PRIORITY_KEY_TO_TEXT[defect.priority]}</td><td className="px-3 py-2">{defect.aiAudit?.used ? defect.aiAudit.reviewedAt ? `Ja — ${formatDate(defect.aiAudit.reviewedAt)} durch ${defect.aiAudit.reviewedBy || walk?.inspector || 'nicht angegeben'} geprüft` : 'KI genutzt — Prüfung offen' : 'Nein'}</td><td className="px-3 py-2">{defect.immediateAction}</td><td className="px-3 py-2">{defect.action}</td><td className="px-3 py-2">{defect.responsible}</td><td className="px-3 py-2">{formatDate(defect.due)}</td>
-    <td className="min-w-52 px-3 py-2"><select className="field min-w-48 py-1.5 text-xs" value={defect.status} onChange={(event) => changeStatus(event.target.value as DefectStatus)}>{Object.entries(DEFECT_STATUS_LABELS).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select></td>
-    <td className="px-3 py-2">{formatDate(defect.doneAt)}</td><td className="px-3 py-2"><input aria-label={`Nachkontrolle am ${defect.mangelId}`} className="field min-w-32 py-1.5 text-xs" type="date" value={defect.recheckAt ?? ''} onChange={(event) => patch({ recheckAt: event.target.value || null })} /></td><td className="px-3 py-2"><input aria-label={`Kontrolliert von ${defect.mangelId}`} className="field min-w-36 py-1.5 text-xs" value={defect.controlledBy} onChange={(event) => patch({ controlledBy: event.target.value })} /></td>
-    <td className="px-3 py-2"><select aria-label={`Mangel behoben ${defect.mangelId}`} className="field min-w-28 py-1.5 text-xs" value={defect.fixed === null ? '' : defect.fixed ? 'yes' : 'no'} onChange={(event) => changeFixed(event.target.value)}><option value="">–</option><option value="yes">Ja</option><option value="no">Nein</option></select></td>
-    <td className="px-3 py-2"><input aria-label={`Neuer Termin ${defect.mangelId}`} className="field min-w-32 py-1.5 text-xs" type="date" value={defect.newDue} onChange={(event) => patch({ newDue: event.target.value })} /></td><td className={`px-3 py-2 whitespace-nowrap ${overdue ? 'font-semibold text-danger' : ''}`}>{formatDate(validDue)}</td><td className="px-3 py-2">{daysOpen}</td><td className={`px-3 py-2 ${overdue ? 'font-bold text-danger' : ''}`}>{overdue ? 'ÜBERFÄLLIG' : ''}</td><td className="px-3 py-2"><input aria-label={`Bemerkung ${defect.mangelId}`} className="field min-w-44 py-1.5 text-xs" value={defect.note} onChange={(event) => patch({ note: event.target.value })} /></td>
+    <td className="min-w-52 px-3 py-2"><select className="field min-w-48 py-1.5 text-xs" value={effectiveStatus} disabled={!!resolution} onChange={(event) => changeStatus(event.target.value as DefectStatus)}>{Object.entries(DEFECT_STATUS_LABELS).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select></td>
+    <td className="px-3 py-2">{formatDate(effectiveDoneAt)}</td><td className="px-3 py-2"><input aria-label={`Nachkontrolle am ${defect.mangelId}`} className="field min-w-32 py-1.5 text-xs" type="date" value={resolution?.recheckAt ?? defect.recheckAt ?? ''} disabled={!!resolution} onChange={(event) => patch({ recheckAt: event.target.value || null })} /></td><td className="px-3 py-2"><input aria-label={`Kontrolliert von ${defect.mangelId}`} className="field min-w-36 py-1.5 text-xs" value={resolution?.controlledBy ?? defect.controlledBy} disabled={!!resolution} onChange={(event) => patch({ controlledBy: event.target.value })} /></td>
+    <td className="px-3 py-2"><select aria-label={`Mangel behoben ${defect.mangelId}`} className="field min-w-28 py-1.5 text-xs" value={effectiveFixed === null ? '' : effectiveFixed ? 'yes' : 'no'} disabled={!!resolution} onChange={(event) => changeFixed(event.target.value)}><option value="">–</option><option value="yes">Ja</option><option value="no">Nein</option></select></td>
+    <td className="px-3 py-2"><input aria-label={`Neuer Termin ${defect.mangelId}`} className="field min-w-32 py-1.5 text-xs" type="date" value={defect.newDue} disabled={!!resolution} onChange={(event) => patch({ newDue: event.target.value })} /></td><td className={`px-3 py-2 whitespace-nowrap ${overdue ? 'font-semibold text-danger' : ''}`}>{formatDate(validDue)}</td><td className="px-3 py-2">{daysOpen}</td><td className={`px-3 py-2 ${overdue ? 'font-bold text-danger' : ''}`}>{overdue ? 'ÜBERFÄLLIG' : ''}</td><td className="px-3 py-2"><input aria-label={`Bemerkung ${defect.mangelId}`} className="field min-w-44 py-1.5 text-xs" value={effectiveNote} disabled={!!resolution} onChange={(event) => patch({ note: event.target.value })} /></td>
   </tr>
   {resolveDialogOpen && <DefectResolutionDialog defect={defect} onCancel={() => setResolveDialogOpen(false)} onCompleted={() => {
     setResolveDialogOpen(false);

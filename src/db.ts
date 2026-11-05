@@ -3,7 +3,7 @@ import { FORM_AREAS, WEEKLY_ITEMS, type Rating } from './data/checklist';
 import { DEFAULT_REGISTER_SETTINGS } from './data/register';
 import { formatWalkNumber, isoWeek, parseWalkNumber, toISODate, toTime, createMangelId } from './lib/dates';
 import { inspectionSeeds } from './lib/register';
-import type { Defect, Inspection, Photo, RegisterSettings, Walk } from './lib/types';
+import type { Defect, DefectResolution, Inspection, Photo, RegisterSettings, Walk } from './lib/types';
 import { nextDefectNr, suggestMonthlyChecked } from './lib/walk';
 
 interface WalkCounter {
@@ -17,6 +17,7 @@ export const db = new Dexie('hse-rundgang') as Dexie & {
   photos: EntityTable<Photo, 'id'>;
   counters: EntityTable<WalkCounter, 'year'>;
   inspections: EntityTable<Inspection, 'id'>;
+  resolutions: EntityTable<DefectResolution, 'id'>;
   settings: EntityTable<RegisterSettings, 'id'>;
 };
 
@@ -153,6 +154,41 @@ db.version(7)
       if (!proposal || typeof (proposal as { mangelBeschreibung?: unknown }).mangelBeschreibung === 'string') return defect;
       return { ...defect, aiAudit: { ...defect.aiAudit!, proposal: { ...proposal, mangelBeschreibung: '' } } };
     }));
+  });
+
+db.version(8)
+  .stores({
+    walks: 'id, date, status, &docNr',
+    defects: 'id, walkId, status, itemId, area, mangelId',
+    photos: 'id, defectId',
+    counters: '&year',
+    inspections: 'id, area',
+    resolutions: 'id, defectId, walkId, resolvedAt',
+    settings: '&id',
+  })
+  .upgrade(async (tx) => {
+    const defects = await tx.table('defects').toArray() as Defect[];
+    const nowTime = new Date().toISOString();
+    const resolutions = defects
+      .filter((defect) => defect.resolvedInWalkId && defect.status === 'done')
+      .map((defect) => ({
+        id: `legacy-resolution-${defect.id}`,
+        defectId: defect.id,
+        walkId: defect.resolvedInWalkId!,
+        resolvedAt: defect.doneAt || defect.updatedAt || nowTime,
+        recheckAt: defect.recheckAt,
+        controlledBy: defect.controlledBy,
+        note: defect.note,
+        createdAt: defect.updatedAt || nowTime,
+      }));
+    if (resolutions.length) await tx.table('resolutions').bulkPut(resolutions);
+    const photos = await tx.table('photos').toArray() as Photo[];
+    const legacyResolutionIds = new Map(resolutions.map((resolution) => [resolution.defectId, resolution.id]));
+    const taggedPhotos = photos.map((photo) => {
+      const resolutionId = legacyResolutionIds.get(photo.defectId);
+      return resolutionId && photo.purpose === 'resolution' && !photo.resolutionId ? { ...photo, resolutionId } : photo;
+    });
+    if (taggedPhotos.length) await tx.table('photos').bulkPut(taggedPhotos);
   });
 
 export const uid = () => crypto.randomUUID();
@@ -327,21 +363,25 @@ export async function updateDefect(id: string, changes: Partial<Defect>): Promis
 
 export async function resolveDefectWithEvidence(id: string, evidencePhotos: Omit<Photo, 'defectId'>[], changes: Partial<Defect> = {}): Promise<void> {
   if (!evidencePhotos.length) throw new Error('Bitte füge mindestens ein Foto der behobenen Stelle hinzu.');
-  await db.transaction('rw', db.defects, db.photos, async () => {
+  await db.transaction('rw', db.defects, db.photos, db.resolutions, async () => {
     const defect = await db.defects.get(id);
     if (!defect) throw new Error('Der Mangel wurde nicht gefunden.');
     const praise = 'Gut gemacht – danke für die sorgfältige Behebung und deinen Beitrag zur Sicherheit!';
     const existingNote = changes.note ?? defect.note;
     const note = existingNote.includes(praise) ? existingNote : [existingNote.trim(), praise].filter(Boolean).join('\n');
-    await db.photos.bulkAdd(evidencePhotos.map((photo) => ({ ...photo, purpose: 'resolution' as const, defectId: id })));
-    await db.defects.update(id, {
-      ...changes,
-      status: 'done',
-      doneAt: toISODate(new Date()),
-      fixed: true,
+    const resolvedAt = now();
+    const resolutionId = uid();
+    await db.resolutions.add({
+      id: resolutionId,
+      defectId: id,
+      walkId: changes.resolvedInWalkId ?? null,
+      resolvedAt,
+      recheckAt: changes.recheckAt ?? toISODate(new Date()),
+      controlledBy: changes.controlledBy ?? '',
       note,
-      updatedAt: now(),
+      createdAt: resolvedAt,
     });
+    await db.photos.bulkAdd(evidencePhotos.map((photo) => ({ ...photo, purpose: 'resolution' as const, resolutionId, defectId: id })));
   });
 }
 
@@ -370,8 +410,9 @@ export async function importBackupData(
   incomingPhotos: Photo[],
   incomingInspections: Inspection[],
   incomingSettings: RegisterSettings | undefined,
+  incomingResolutions: DefectResolution[] = [],
 ) {
-  return db.transaction('rw', [db.walks, db.defects, db.photos, db.counters, db.inspections, db.settings], async () => {
+  return db.transaction('rw', [db.walks, db.defects, db.photos, db.counters, db.inspections, db.resolutions, db.settings], async () => {
     const local = await db.walks.toArray();
     const byId = new Map(local.map((walk) => [walk.id, walk]));
     const byNumber = new Map(local.map((walk) => [walk.docNr, walk.id]));
@@ -400,8 +441,10 @@ export async function importBackupData(
     const defects = incomingDefects.filter((defect) => !skipped.has(defect.walkId));
     const ids = new Set(defects.map((defect) => defect.id));
     const photos = incomingPhotos.filter((photo) => ids.has(photo.defectId));
+    const resolutions = incomingResolutions.filter((resolution) => !skipped.has(resolution.walkId ?? '') && ids.has(resolution.defectId));
     if (defects.length) await db.defects.bulkPut(defects);
     if (photos.length) await db.photos.bulkPut(photos);
+    if (resolutions.length) await db.resolutions.bulkPut(resolutions);
     if (incomingInspections.length) await db.inspections.bulkPut(incomingInspections);
     if (incomingSettings) await db.settings.put({
       ...incomingSettings,
@@ -410,15 +453,21 @@ export async function importBackupData(
       aiConsentAt: null,
       id: 'app',
     });
-    return { walks: accepted.size, defects: defects.length, photos: photos.length, inspections: incomingInspections.length, collisions };
+    return { walks: accepted.size, defects: defects.length, photos: photos.length, resolutions: resolutions.length, inspections: incomingInspections.length, collisions };
   });
 }
 
 export async function openDefectsBefore(walk: Walk): Promise<{ defect: Defect; walk?: Walk }[]> {
-  const [defects, walks] = await Promise.all([db.defects.toArray(), db.walks.toArray()]);
+  const [defects, walks, resolutions] = await Promise.all([db.defects.toArray(), db.walks.toArray(), db.resolutions.toArray()]);
   const byId = new Map(walks.map((item) => [item.id, item]));
+  const resolvedBefore = new Set(resolutions.filter((resolution) => {
+    if (resolution.walkId === walk.id) return true;
+    const resolutionWalk = resolution.walkId ? byId.get(resolution.walkId) : undefined;
+    if (resolutionWalk) return resolutionWalk.date < walk.date || (resolutionWalk.date === walk.date && resolutionWalk.createdAt < walk.createdAt);
+    return resolution.resolvedAt < walk.createdAt;
+  }).map((resolution) => resolution.defectId));
   return defects
-    .filter((defect) => defect.status !== 'done' && defect.walkId !== walk.id)
+    .filter((defect) => defect.status !== 'done' && defect.walkId !== walk.id && !resolvedBefore.has(defect.id))
     .map((defect) => ({ defect, walk: byId.get(defect.walkId) }))
     .filter(({ walk: source }) => !source || source.date < walk.date || (source.date === walk.date && source.createdAt < walk.createdAt))
     .sort((a, b) => (a.walk?.date ?? '').localeCompare(b.walk?.date ?? '') || a.defect.nr - b.defect.nr);

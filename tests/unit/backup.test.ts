@@ -50,6 +50,13 @@ describe('JSON backup format v4', () => {
     expect(JSON.stringify(exported)).not.toContain('do-not-export-this');
   });
 
+  it('preserves separate defect resolution events in a portable backup', async () => {
+    const resolution = { id: 'resolution-1', defectId: 'defect-1', walkId: 'walk-1', resolvedAt: '2026-10-10T12:00:00.000Z', recheckAt: '2026-10-10', controlledBy: 'Max', note: 'Gut gemacht!', createdAt: '2026-10-10T12:00:00.000Z' };
+    const exported = await buildBackup([], [], [], [], DEFAULT_REGISTER_SETTINGS, [resolution]);
+    expect(parseBackup(JSON.stringify(exported)).resolutions).toEqual([resolution]);
+    expect(parseBackup(backup()).resolutions).toBeUndefined();
+  });
+
   it('requires fresh local privacy consent after importing settings from another device', async () => {
     await importBackupData([], [], [], [], { ...DEFAULT_REGISTER_SETTINGS, aiEnabled: true, aiServerUrl: 'https://worker.example', aiAccessCode: 'not-in-backup', aiConsentAt: '2026-10-21T12:00:00Z' });
     expect(await db.settings.get('app')).toMatchObject({ aiEnabled: false, aiAccessCode: '', aiConsentAt: null, aiServerUrl: 'https://worker.example' });

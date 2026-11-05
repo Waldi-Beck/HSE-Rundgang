@@ -97,6 +97,7 @@ export interface Defect {
   newDue: string;
   note: string;
   /** Current round in which a previously recorded defect was verified as resolved. */
+  /** @deprecated Legacy field; new resolutions are stored separately. */
   resolvedInWalkId?: string | null;
   aiAudit?: AiAudit | null;
   createdAt: string;
@@ -111,6 +112,19 @@ export interface Photo {
   height: number;
   createdAt: string;
   purpose?: 'resolution';
+  resolutionId?: string;
+}
+
+export interface DefectResolution {
+  id: string;
+  defectId: string;
+  /** Null when resolution was recorded from the register outside a walk. */
+  walkId: string | null;
+  resolvedAt: string;
+  recheckAt: string | null;
+  controlledBy: string;
+  note: string;
+  createdAt: string;
 }
 
 export interface Inspection {

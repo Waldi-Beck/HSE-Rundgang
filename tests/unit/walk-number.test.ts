@@ -103,7 +103,7 @@ describe('Rundgang-Nummer', () => {
 
     await db.open();
     expect(await db.walks.count()).toBe(0);
-    expect(db.verno).toBe(7);
+    expect(db.verno).toBe(8);
     expect(await db.inspections.count()).toBe(15);
     expect(await db.settings.get('app')).toMatchObject({ maxIntervalDays: 14 });
     const fresh = await createWalk(new Date(2026, 9, 6));
@@ -123,7 +123,7 @@ describe('Rundgang-Nummer', () => {
       [],
       undefined,
     );
-    expect(result).toEqual({ walks: 2, defects: 0, photos: 0, inspections: 0, collisions: [existing.docNr] });
+    expect(result).toEqual({ walks: 2, defects: 0, photos: 0, resolutions: 0, inspections: 0, collisions: [existing.docNr] });
     expect((await db.walks.get(existing.id))?.docNr).toBe(existing.docNr);
     expect(await db.walks.get('collision')).toBeUndefined();
     expect((await db.walks.get('imported'))?.docNr).toBe('HSE-RG-2026-004');

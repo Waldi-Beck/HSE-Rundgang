@@ -6,7 +6,7 @@ import { DEFECT_STATUS_LABELS, PRIORITY_KEY_TO_TEXT, RESULT_LABELS } from '../da
 import { addDays, displayWalkNumber, durationMinutes, formatDate, formatDuration, toISODate } from './dates';
 import { blobToDataUrl } from './image';
 import { priorityDays, suggestedResult, validDefectDue } from './register';
-import type { Defect, Photo, RegisterSettings, ResultKey, Walk } from './types';
+import type { Defect, DefectResolution, Photo, RegisterSettings, ResultKey, Walk } from './types';
 import { cellKey, defectItemLabel } from './walk';
 
 const MARGIN = 8;
@@ -33,7 +33,7 @@ export interface PdfInput {
   defects: Defect[];
   photos: Photo[];
   openFromPrevious: { defect: Defect; walk?: Walk }[];
-  resolvedFromPrevious?: { defect: Defect; walk?: Walk }[];
+  resolvedFromPrevious?: { defect: Defect; walk?: Walk; resolution: DefectResolution }[];
   fileBaseName: string;
   settings: RegisterSettings;
 }
@@ -299,7 +299,8 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   doc.setTextColor(...MUTED);
   doc.text(doc.splitTextToSize(PRIORITY_NOTE, contentWidth), MARGIN, y + 1.4);
   y += 5;
-  const photosFor = (defectId: string) => photos.filter((photo) => photo.defectId === defectId);
+  const photosFor = (defectId: string) => photos.filter((photo) => photo.defectId === defectId && photo.purpose !== 'resolution');
+  const resolutionPhotosFor = (resolutionId: string) => photos.filter((photo) => photo.resolutionId === resolutionId);
   const photoSize = { width: 37, height: 28 };
   const defectRows: RowInput[] = defects.length ? defects.map((defect) => [
     '',
@@ -417,16 +418,16 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
 
   if (resolvedFromPrevious.length) {
     sectionTitle(`Behobene Mängel aus vorherigen Rundgängen (${resolvedFromPrevious.length})`);
-    const resolvedRows: RowInput[] = resolvedFromPrevious.map(({ defect, walk: source }) => {
-      const afterPhotos = photosFor(defect.id).filter((photo) => photo.purpose === 'resolution');
+    const resolvedRows: RowInput[] = resolvedFromPrevious.map(({ defect, walk: source, resolution }) => {
+      const afterPhotos = resolutionPhotosFor(resolution.id);
       return [
         source ? displayWalkNumber(source.date) : 'nicht hinterlegt',
         `M${String(defect.nr).padStart(2, '0')}`,
         `${defectItemLabel(defect.itemId)} / ${areaLabel(defect.area, settings.areas)}`,
         safePdfDescription(defect.description),
-        formatDate(defect.doneAt || defect.recheckAt),
+        formatDate(resolution.resolvedAt),
         afterPhotos.length ? `${afterPhotos.length} Nachher-Foto(s)` : 'Kein Nachher-Foto hinterlegt',
-        defect.note ? safePdfDescription(defect.note) : '–',
+        resolution.note ? safePdfDescription(resolution.note) : '–',
       ];
     });
     autoTable(doc, {
@@ -441,8 +442,8 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     });
     y = lastY(doc) + 3;
 
-    for (const { defect } of resolvedFromPrevious) {
-      const evidence = photosFor(defect.id).filter((photo) => photo.purpose === 'resolution');
+    for (const { defect, resolution } of resolvedFromPrevious) {
+      const evidence = resolutionPhotosFor(resolution.id);
       if (!evidence.length) continue;
       for (const [index, photo] of evidence.entries()) {
         const imageW = Math.min(contentWidth / 2 - 4, 70);
@@ -456,7 +457,7 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7.5);
         doc.setTextColor(...GREEN);
-        doc.text(`Nachher-Foto zu ${defect.mangelId}${evidence.length > 1 ? ` (${index + 1}/${evidence.length})` : ''} · behoben am ${formatDate(defect.doneAt || defect.recheckAt)}`, MARGIN, y + 2);
+        doc.text(`Nachher-Foto zu ${defect.mangelId}${evidence.length > 1 ? ` (${index + 1}/${evidence.length})` : ''} · behoben am ${formatDate(resolution.resolvedAt)}`, MARGIN, y + 2);
         const url = photoData.get(photo.id);
         if (url) doc.addImage(url, 'JPEG', MARGIN, y + 4, imageWidth, imageHeight, undefined, 'FAST');
         y += imageHeight + 7;

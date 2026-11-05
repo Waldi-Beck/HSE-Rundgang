@@ -38,7 +38,7 @@ export function BackupPage() {
     try {
       const b = parseBackup(await file.text());
       const photos = await backupPhotosToBlobs(b.photos);
-      const result = await importBackupData(b.walks, b.defects, photos, b.inspections, b.settings);
+      const result = await importBackupData(b.walks, b.defects, photos, b.inspections, b.settings, b.resolutions ?? []);
       const collisions = result.collisions.length
         ? ` Nummernkonflikte übersprungen: ${[...new Set(result.collisions)].join(', ')}.`
         : '';

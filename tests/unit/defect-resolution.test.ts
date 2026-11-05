@@ -28,15 +28,13 @@ describe('Behebung mit Foto-Nachweis', () => {
     expect(await db.photos.count()).toBe(0);
   });
 
-  it('saves evidence, marks the defect fixed and appends the automatic thank-you', async () => {
+  it('saves a separate resolution, preserves the source defect, and appends the automatic thank-you', async () => {
     await db.defects.put(defect);
     await resolveDefectWithEvidence(defect.id, [evidence], { resolvedInWalkId: 'current-walk' });
-    expect(await db.defects.get(defect.id)).toMatchObject({
-      status: 'done', fixed: true, doneAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      resolvedInWalkId: 'current-walk',
-      note: expect.stringContaining('Vorheriger Hinweis bleibt erhalten.\nGut gemacht'),
-    });
+    expect(await db.defects.get(defect.id)).toEqual(defect);
+    const [resolution] = await db.resolutions.toArray();
+    expect(resolution).toMatchObject({ defectId: defect.id, walkId: 'current-walk', note: expect.stringContaining('Gut gemacht') });
     const savedPhoto = await db.photos.where('defectId').equals(defect.id).first();
-    expect(savedPhoto).toMatchObject({ purpose: 'resolution', width: evidence.width, height: evidence.height });
+    expect(savedPhoto).toMatchObject({ purpose: 'resolution', resolutionId: expect.any(String), width: evidence.width, height: evidence.height });
   });
 });

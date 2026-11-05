@@ -15,12 +15,19 @@ async function createWalkPdf(walkId: string): Promise<{ filename: string; blob: 
   const walk = await db.walks.get(walkId);
   if (!walk) throw new Error('Rundgang nicht gefunden.');
   const defects = (await db.defects.where('walkId').equals(walkId).toArray()).sort((a, b) => a.nr - b.nr);
-  const resolvedDefects = (await db.defects.toArray()).filter((defect) => defect.resolvedInWalkId === walkId);
-  const allWalks = resolvedDefects.length ? await db.walks.toArray() : [];
+  const resolutions = await db.resolutions.where('walkId').equals(walkId).toArray();
+  const resolutionDefects = resolutions.length ? await db.defects.bulkGet(resolutions.map((resolution) => resolution.defectId)) : [];
+  const allWalks = resolutions.length ? await db.walks.toArray() : [];
   const walksById = new Map(allWalks.map((item) => [item.id, item]));
-  const resolvedFromPrevious = resolvedDefects.map((defect) => ({ defect, walk: walksById.get(defect.walkId) }));
-  const photoDefectIds = [...new Set([...defects, ...resolvedDefects].map((defect) => defect.id))];
-  const photos = photoDefectIds.length ? await db.photos.where('defectId').anyOf(photoDefectIds).toArray() : [];
+  const resolvedFromPrevious = resolutions.flatMap((resolution, index) => {
+    const defect = resolutionDefects[index];
+    return defect ? [{ defect, walk: walksById.get(defect.walkId), resolution }] : [];
+  });
+  const currentDefectIds = [...new Set(defects.map((defect) => defect.id))];
+  const currentPhotos = currentDefectIds.length ? await db.photos.where('defectId').anyOf(currentDefectIds).toArray() : [];
+  const resolutionIds = new Set(resolutions.map((resolution) => resolution.id));
+  const resolutionPhotos = resolutions.length ? (await db.photos.toArray()).filter((photo) => photo.resolutionId && resolutionIds.has(photo.resolutionId)) : [];
+  const photos = [...currentPhotos.filter((photo) => photo.purpose !== 'resolution'), ...resolutionPhotos];
   photos.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const openFromPrevious = await openDefectsBefore(walk);
   const fileBaseName = await reportFileBase(walk);
@@ -64,10 +71,10 @@ export async function exportRegisterXlsx(): Promise<string> {
 }
 
 export async function exportBackupJson(): Promise<string> {
-  const [walks, defects, photos, inspections, savedSettings] = await Promise.all([
-    db.walks.toArray(), db.defects.toArray(), db.photos.toArray(), db.inspections.toArray(), db.settings.get('app'),
+  const [walks, defects, photos, inspections, savedSettings, resolutions] = await Promise.all([
+    db.walks.toArray(), db.defects.toArray(), db.photos.toArray(), db.inspections.toArray(), db.settings.get('app'), db.resolutions.toArray(),
   ]);
-  const backup = await buildBackup(walks, defects, photos, inspections, savedSettings ?? DEFAULT_REGISTER_SETTINGS);
+  const backup = await buildBackup(walks, defects, photos, inspections, savedSettings ?? DEFAULT_REGISTER_SETTINGS, resolutions);
   const filename = `hse-rundgang-backup_${toISODate(new Date())}.json`;
   downloadBlob(new Blob([JSON.stringify(backup)], { type: 'application/json' }), filename);
   try { localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString()); } catch { /* localStorage may be unavailable */ }

@@ -2,7 +2,7 @@
 import { SOP_META } from '../data/checklist';
 import { parseWalkNumber } from './dates';
 import { blobToDataUrl, dataUrlToBlob } from './image';
-import type { Defect, Inspection, Photo, RegisterSettings, Walk } from './types';
+import type { Defect, DefectResolution, Inspection, Photo, RegisterSettings, Walk } from './types';
 
 export const BACKUP_FORMAT = 'qps-hse-rundgang-backup';
 export const BACKUP_VERSION = 4;
@@ -19,6 +19,7 @@ export interface BackupFile {
   walks: Walk[];
   defects: Defect[];
   photos: BackupPhoto[];
+  resolutions?: DefectResolution[];
   inspections: Inspection[];
   settings: RegisterSettings;
 }
@@ -29,6 +30,7 @@ export async function buildBackup(
   photos: Photo[],
   inspections: Inspection[],
   settings: RegisterSettings,
+  resolutions: DefectResolution[] = [],
 ): Promise<BackupFile> {
   const portableSettings = { ...settings };
   delete portableSettings.aiAccessCode;
@@ -40,6 +42,7 @@ export async function buildBackup(
     walks,
     defects,
     photos: await Promise.all(photos.map(async ({ blob, ...rest }) => ({ ...rest, dataUrl: await blobToDataUrl(blob) }))),
+    resolutions,
     inspections,
     settings: portableSettings,
   };

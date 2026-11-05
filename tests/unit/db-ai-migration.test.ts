@@ -26,7 +26,7 @@ describe('Migration der KI-Mangelbeschreibung', () => {
     old.close();
     await db.open();
     const defect = await db.defects.get('legacy-ai-defect');
-    expect(db.verno).toBe(7);
+    expect(db.verno).toBe(8);
     expect(defect?.aiAudit?.proposal).toMatchObject({ mangelBeschreibung: '' });
     db.close();
   });
