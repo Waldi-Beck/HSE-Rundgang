@@ -166,7 +166,7 @@ function DefectResolutionDialog({ defect, onCancel, onCompleted }: { defect: Def
         <legend className="label">Nachher-Foto (erforderlich)</legend>
         <PhotoInput photos={photos} onAdd={(added) => setPhotos((current) => [...current, ...added])} onRemove={(id) => setPhotos((current) => current.filter((photo) => photo.id !== id))} />
       </fieldset>
-      <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-ink">Nach dem Speichern wird automatisch ergänzt: „Gut gemacht – danke für die sorgfältige Behebung und deinen Beitrag zur Sicherheit!“</p>
+      <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-ink">Nach dem Speichern wird automatisch ein wechselnder Lobssatz ergänzt.</p>
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       <div className="flex gap-2">
         <button type="button" className="btn-secondary flex-1" onClick={onCancel} disabled={saving}>Abbrechen</button>

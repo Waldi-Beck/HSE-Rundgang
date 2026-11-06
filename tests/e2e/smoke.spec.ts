@@ -307,7 +307,7 @@ test('Mangelbehebung erfordert ein Nachher-Foto und ergänzt einen Dankessatz', 
   await evidenceDialog.getByTestId('confirm-defect-resolution').click();
   await expect(evidenceDialog).toHaveCount(0);
   await expect(row.locator('select').first()).toHaveValue('done');
-  await expect(row.getByLabel(/Bemerkung/)).toHaveValue(/Gut gemacht – danke für die sorgfältige Behebung/);
+  await expect(row.getByLabel(/Bemerkung/)).toHaveValue(/(Sehr gut gemacht|Stark umgesetzt|Sauber erledigt|Prima gelöst|Klasse Einsatz) –/);
 });
 
 test('offenen Punkt aus dem vorherigen Rundgang mit Foto und Dankessatz abschliessen', async ({ page }) => {
@@ -342,5 +342,5 @@ test('offenen Punkt aus dem vorherigen Rundgang mit Foto und Dankessatz abschlie
   const pdfText = readFileSync(pdfPath, 'latin1');
   expect(pdfText).toContain('Behobene Mängel aus vorherigen Rundgängen');
   expect(pdfText).toContain('Nachher-Foto');
-  expect(pdfText).toContain('Gut gemacht');
+  expect(pdfText).toMatch(/(Sehr gut gemacht|Stark umgesetzt|Sauber erledigt|Prima gelöst|Klasse Einsatz)/);
 });

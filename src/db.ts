@@ -3,6 +3,7 @@ import { FORM_AREAS, WEEKLY_ITEMS, type Rating } from './data/checklist';
 import { DEFAULT_REGISTER_SETTINGS } from './data/register';
 import { formatWalkNumber, isoWeek, parseWalkNumber, toISODate, toTime, createMangelId } from './lib/dates';
 import { inspectionSeeds } from './lib/register';
+import { uniqueResolutionPraise } from './lib/resolution-praise';
 import type { Defect, DefectResolution, Inspection, Photo, RegisterSettings, Walk } from './lib/types';
 import { nextDefectNr, suggestMonthlyChecked } from './lib/walk';
 
@@ -361,12 +362,13 @@ export async function updateDefect(id: string, changes: Partial<Defect>): Promis
   });
 }
 
-export async function resolveDefectWithEvidence(id: string, evidencePhotos: Omit<Photo, 'defectId'>[], changes: Partial<Defect> = {}): Promise<void> {
+export async function resolveDefectWithEvidence(id: string, evidencePhotos: Omit<Photo, 'defectId'>[], changes: Partial<Defect> = {}, random: () => number = Math.random): Promise<void> {
   if (!evidencePhotos.length) throw new Error('Bitte füge mindestens ein Foto der behobenen Stelle hinzu.');
   await db.transaction('rw', db.defects, db.photos, db.resolutions, async () => {
     const defect = await db.defects.get(id);
     if (!defect) throw new Error('Der Mangel wurde nicht gefunden.');
-    const praise = 'Gut gemacht – danke für die sorgfältige Behebung und deinen Beitrag zur Sicherheit!';
+    const previousResolutions = await db.resolutions.toArray();
+    const praise = uniqueResolutionPraise(previousResolutions.map((resolution) => resolution.note), random);
     const existingNote = changes.note ?? defect.note;
     const note = existingNote.includes(praise) ? existingNote : [existingNote.trim(), praise].filter(Boolean).join('\n');
     const resolvedAt = now();
