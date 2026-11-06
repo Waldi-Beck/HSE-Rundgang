@@ -1,12 +1,13 @@
 import { CaretRight, Plus, Trash, WarningCircle } from '@phosphor-icons/react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { createWalk, db, deleteWalk } from '../db';
 import { displayWalkNumber, formatDate, weekLabel } from '../lib/dates';
 import { overviewMetrics, roundRegisterRows } from '../lib/register';
 import { Badge, EmptyState, useToast } from '../components/ui';
 import { useRegisterSettings } from '../components/SettingsContext';
+import type { Photo } from '../lib/types';
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -15,9 +16,26 @@ export function DashboardPage() {
   const [creating, setCreating] = useState(false);
   const walks = useLiveQuery(() => db.walks.toArray());
   const defects = useLiveQuery(() => db.defects.toArray());
+  const photos = useLiveQuery(() => db.photos.toArray());
   const dataReady = !!walks && !!defects;
   const metrics = dataReady ? overviewMetrics(walks, defects, settings) : null;
   const recentRounds = dataReady ? roundRegisterRows(walks, defects, settings).slice().reverse().slice(0, 8) : [];
+  const photosByWalk = useMemo(() => {
+    const defectById = new Map((defects ?? []).map((defect) => [defect.id, defect]));
+    const grouped = new Map<string, Photo[]>();
+    for (const photo of photos ?? []) {
+      if (photo.purpose === 'resolution') continue;
+      const defect = defectById.get(photo.defectId);
+      if (!defect) continue;
+      const walkPhotos = grouped.get(defect.walkId) ?? [];
+      walkPhotos.push(photo);
+      grouped.set(defect.walkId, walkPhotos);
+    }
+    for (const walkPhotos of grouped.values()) {
+      walkPhotos.sort((a, b) => (defectById.get(a.defectId)?.nr ?? 0) - (defectById.get(b.defectId)?.nr ?? 0));
+    }
+    return grouped;
+  }, [defects, photos]);
 
   const start = async () => {
     setCreating(true);
@@ -131,6 +149,7 @@ export function DashboardPage() {
                           {monthlyWarning && <Badge tone="warn">2.2 fehlt</Badge>}
                         </div>
                         <p className="mt-0.5 text-sm text-muted">{formatDate(walk.date)} · {walk.inspector || 'ohne Namen'} · {defectCount} Mängel{interval === 'überschritten' ? ' · Intervall überschritten' : ''}</p>
+                        <WalkPhotoPreview photos={photosByWalk.get(walk.id) ?? []} />
                       </div>
                       <CaretRight size={18} className="shrink-0 text-muted" aria-hidden />
                     </Link>
@@ -146,6 +165,27 @@ export function DashboardPage() {
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+function WalkPhotoPreview({ photos }: { photos: Photo[] }) {
+  const [previews, setPreviews] = useState<{ id: string; src: string }[]>([]);
+
+  useEffect(() => {
+    const urls = photos.slice(0, 3).map((photo) => ({ id: photo.id, src: URL.createObjectURL(photo.blob) }));
+    setPreviews(urls);
+    return () => urls.forEach(({ src }) => URL.revokeObjectURL(src));
+  }, [photos]);
+
+  if (!photos.length) return null;
+
+  return (
+    <div className="mt-2 flex items-center gap-1.5" data-testid="walk-photo-preview" aria-label={`${photos.length} ${photos.length === 1 ? 'Foto' : 'Fotos'} im Rundgang`}>
+      {previews.map(({ id, src }, index) => (
+        <img key={id} src={src} alt={`Foto ${index + 1} im Rundgang`} loading="lazy" className="h-9 w-12 rounded-md border border-line object-cover" />
+      ))}
+      <span className="ml-1 text-xs text-muted">{photos.length} {photos.length === 1 ? 'Foto' : 'Fotos'}</span>
     </div>
   );
 }

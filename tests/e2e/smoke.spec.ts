@@ -216,6 +216,9 @@ test('neuer Rundgang, optionale Monatspunkte, Mangel mit Foto, Abschluss, Regist
 
   await page.getByRole('link', { name: 'Übersicht', exact: true }).click();
   await expect(page.getByTestId('overview-round-count')).toHaveText('1');
+  const recentWalkPhotos = page.getByTestId('walk-photo-preview');
+  await expect(recentWalkPhotos).toHaveAttribute('aria-label', '1 Foto im Rundgang');
+  await expect(recentWalkPhotos.locator('img')).toHaveCount(1);
   await page.getByTestId('new-walk').click();
   const secondDocNr = (await page.getByTestId('walk-docnr').textContent())?.trim();
   expect(secondDocNr).toMatch(/^HSE-RG_\d{4}_\d{2}_\d{2}$/);
