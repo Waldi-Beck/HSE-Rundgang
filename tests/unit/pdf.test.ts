@@ -128,6 +128,7 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
     expect(pdf.output()).toContain('Gut gemacht');
     expect(pdf.output()).toContain('Behobene Mängel aus vorherigen Rundgängen');
     expect(pdf.output()).toContain('HSE-RG_2026_10_01');
+    expect(pdf.output()).toContain('Fotobeweis');
   });
 
   it('druckt QPS-Logo und unveränderte SOP-Dokumenten-ID auf mindestens drei Seiten', async () => {

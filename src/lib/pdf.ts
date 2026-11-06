@@ -419,14 +419,13 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
   if (resolvedFromPrevious.length) {
     sectionTitle(`Behobene Mängel aus vorherigen Rundgängen (${resolvedFromPrevious.length})`);
     const resolvedRows: RowInput[] = resolvedFromPrevious.map(({ defect, walk: source, resolution }) => {
-      const afterPhotos = resolutionPhotosFor(resolution.id);
       return [
         source ? displayWalkNumber(source.date) : 'nicht hinterlegt',
         `M${String(defect.nr).padStart(2, '0')}`,
         `${defectItemLabel(defect.itemId)} / ${areaLabel(defect.area, settings.areas)}`,
         safePdfDescription(defect.description),
         formatDate(resolution.resolvedAt),
-        afterPhotos.length ? `${afterPhotos.length} Nachher-Foto(s)` : 'Kein Nachher-Foto hinterlegt',
+        '',
         resolution.note ? safePdfDescription(resolution.note) : '–',
       ];
     });
@@ -436,34 +435,50 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
       head: [['Ursprünglicher Rundgang', 'Mangel-Nr.', 'Kontrollpunkt / Bereich', 'Behobener Mangel', 'Behoben am', 'Fotobeweis', 'Bemerkung / Rückmeldung']],
       body: resolvedRows,
       rowPageBreak: 'avoid',
-      styles: { ...common.styles, fontSize: 6.2, cellPadding: 0.8, valign: 'top' },
+      styles: { ...common.styles, fontSize: 6.2, cellPadding: 0.8, valign: 'top', minCellHeight: 34 },
       headStyles: { ...common.headStyles, fontSize: 6 },
-      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 14 }, 2: { cellWidth: 30 }, 3: { cellWidth: 43 }, 4: { cellWidth: 18 }, 5: { cellWidth: 23 }, 6: { cellWidth: contentWidth - 153 } },
+      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 14 }, 2: { cellWidth: 30 }, 3: { cellWidth: 36 }, 4: { cellWidth: 18 }, 5: { cellWidth: 38, halign: 'center' }, 6: { cellWidth: contentWidth - 161 } },
+      didParseCell: (cell) => {
+        if (cell.section !== 'body' || cell.column.index !== 5) return;
+        const entry = resolvedFromPrevious[cell.row.index];
+        const evidence = entry ? resolutionPhotosFor(entry.resolution.id) : [];
+        if (evidence.length) cell.cell.styles.minCellHeight = Math.max(34, 24 * evidence.length + 7);
+      },
+      didDrawCell: (cell) => {
+        if (cell.section !== 'body' || cell.column.index !== 5) return;
+        const entry = resolvedFromPrevious[cell.row.index];
+        if (!entry) return;
+        const evidence = resolutionPhotosFor(entry.resolution.id);
+        if (!evidence.length) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(5.5);
+          doc.setTextColor(...MUTED);
+          doc.text('Kein Foto', cell.cell.x + cell.cell.width / 2, cell.cell.y + cell.cell.height / 2, { align: 'center' });
+          return;
+        }
+        const padding = 1.2;
+        const labelHeight = 3.2;
+        const gap = 1;
+        const maxImageHeight = Math.max(10, (cell.cell.height - padding * 2 - labelHeight * evidence.length - gap * (evidence.length - 1)) / evidence.length);
+        let imageY = cell.cell.y + padding;
+        for (const [index, photo] of evidence.entries()) {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(4.8);
+          doc.setTextColor(...GREEN);
+          doc.text(`Nachher-Foto${evidence.length > 1 ? ` ${index + 1}` : ''}`, cell.cell.x + cell.cell.width / 2, imageY + 2.4, { align: 'center' });
+          imageY += labelHeight;
+          const url = photoData.get(photo.id);
+          if (url) {
+            const scale = Math.min((cell.cell.width - padding * 2) / photo.width, maxImageHeight / photo.height);
+            const imageWidth = photo.width * scale;
+            const imageHeight = photo.height * scale;
+            doc.addImage(url, 'JPEG', cell.cell.x + (cell.cell.width - imageWidth) / 2, imageY, imageWidth, imageHeight, undefined, 'FAST');
+            imageY += imageHeight + gap;
+          }
+        }
+      },
     });
     y = lastY(doc) + 3;
-
-    for (const { defect, resolution } of resolvedFromPrevious) {
-      const evidence = resolutionPhotosFor(resolution.id);
-      if (!evidence.length) continue;
-      for (const [index, photo] of evidence.entries()) {
-        const imageW = Math.min(contentWidth / 2 - 4, 70);
-        const scale = Math.min(imageW / photo.width, 50 / photo.height);
-        const imageWidth = photo.width * scale;
-        const imageHeight = photo.height * scale;
-        if (y + imageHeight + 12 > height - PAGE_BOTTOM) {
-          doc.addPage();
-          y = PAGE_TOP;
-        }
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7.5);
-        doc.setTextColor(...GREEN);
-        doc.text(`Nachher-Foto zu ${defect.mangelId}${evidence.length > 1 ? ` (${index + 1}/${evidence.length})` : ''} · behoben am ${formatDate(resolution.resolvedAt)}`, MARGIN, y + 2);
-        const url = photoData.get(photo.id);
-        if (url) doc.addImage(url, 'JPEG', MARGIN, y + 4, imageWidth, imageHeight, undefined, 'FAST');
-        y += imageHeight + 7;
-      }
-    }
-    y += 2;
   }
 
   if (y + 55 > height - PAGE_BOTTOM) {
