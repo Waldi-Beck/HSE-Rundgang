@@ -60,7 +60,7 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
 
   it('separates old open measures from current-round defects and uses current-only outcome', async () => {
     const previousWalk = { ...walk, id: 'previous-walk', docNr: 'HSE-RG-2026-019', date: '2026-10-01', status: 'closed' as const };
-    const previousDefect = makeDefect({ walkId: previousWalk.id, nr: 1, mangelId: '2026-10-01-M01', area: 'xtec-werkstatt', description: 'Fluchtweg durch Material blockiert', due: '2026-10-03' });
+    const previousDefect = makeDefect({ walkId: previousWalk.id, nr: 1, mangelId: '2026-10-01-M01', area: 'xtec-werkstatt', description: 'Fluchtweg durch Material blockiert', status: 'inProgress', note: 'Wartet auf Ersatzteil; Lieferung am 12.10.', due: '2026-10-03' });
     const currentWalk = { ...walk, docNr: 'HSE-RG-2026-020', status: 'closed' as const, result: 'open' as const, closedAt: '2026-10-10T10:00:00.000Z' };
     const pdf = await buildReportPdf({
       walk: currentWalk, defects: [], photos: [], openFromPrevious: [{ defect: previousDefect, walk: previousWalk }],
@@ -68,7 +68,7 @@ describe('PDF Kopfzeile (SOP QPS_HSE_00064)', () => {
       settings: { id: 'app', areas: ['Engineering', 'QLabs', 'xTec Lager', 'xTec Werkstatt'], priorityDays: { K: 0, H: 2, M: 7, N: 30 }, maxIntervalDays: 14 },
     });
     const output = pdf.output();
-    for (const text of ['Keine neuen Mängel festgestellt.', 'Offene Massnahmen aus vorherigen', '(1)', 'HSE-RG_2026_10_01', 'M01', 'R1', 'QxTec', 'Fluchtweg durch Material blockiert', 'Status: ABGESCHLOSSEN']) expect(output).toContain(text);
+    for (const text of ['Keine neuen Mängel festgestellt.', 'Offene Massnahmen aus vorherigen', '(1)', 'HSE-RG_2026_10_01', 'M01', 'R1', 'QxTec', 'Fluchtweg durch Material blockiert', 'In Bearbeitung', 'Grund der noch offenen Massnahme', 'Wartet auf Ersatzteil', 'Status: ABGESCHLOSSEN']) expect(output).toContain(text);
     expect(pdfResultForWalk('open', [])).toBe('none');
     expect(pdfResultForWalk('none', [makeDefect({ priority: 'M' })])).toBe('minor');
     expect(pdfResultForWalk('none', [makeDefect({ priority: 'K' })])).toBe('critical');

@@ -399,7 +399,9 @@ export async function buildReportPdf(input: PdfInput): Promise<jsPDF> {
     const effectiveDue = validDefectDue(sourceDate, defect, settings);
     const originalDue = defect.due || addDays(sourceDate, priorityDays(settings, defect.priority));
     const overdue = effectiveDue < toISODate(new Date());
-    return [source ? displayWalkNumber(source.date) : 'nicht hinterlegt', `M${String(defect.nr).padStart(2, '0')}`, defectItemLabel(defect.itemId) || '–', areaLabel(defect.area, settings.areas), safePdfDescription(defect.description), DEFECT_STATUS_LABELS[defect.status] ?? 'Status nicht hinterlegt', formatDate(originalDue), overdue ? 'ÜBERFÄLLIG' : 'fristgerecht'];
+    const description = safePdfDescription(defect.description);
+    const reason = defect.note.trim() ? `\nBemerkung / Grund der noch offenen Massnahme: ${safePdfDescription(defect.note)}` : '';
+    return [source ? displayWalkNumber(source.date) : 'nicht hinterlegt', `M${String(defect.nr).padStart(2, '0')}`, defectItemLabel(defect.itemId) || '–', areaLabel(defect.area, settings.areas), `${description}${reason}`, DEFECT_STATUS_LABELS[defect.status] ?? 'Status nicht hinterlegt', formatDate(originalDue), overdue ? 'ÜBERFÄLLIG' : 'fristgerecht'];
   }) : [[{ content: 'Keine offenen Massnahmen aus vorherigen Rundgängen.', colSpan: 8, styles: { textColor: MUTED } }]];
   autoTable(doc, {
     ...common,

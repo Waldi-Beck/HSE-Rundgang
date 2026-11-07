@@ -42,11 +42,17 @@ export function DefectRow({
   const daysOpen = defectDaysOpen(walkDate, defect);
   const overdue = defect.status !== 'done' && validDue < new Date().toISOString().slice(0, 10);
   const resolving = status === 'done' || fixed === 'yes';
+  const reasonRequired = status === 'inProgress' || fixed === 'no';
+  const reasonMissing = reasonRequired && !note.trim();
 
   const saveFollowup = async () => {
     setSavingFollowup(true);
     setResolutionError('');
     try {
+    if (reasonMissing) {
+      setResolutionError('Bitte begründe in der Bemerkung, warum der Mangel noch nicht vollständig behoben ist.');
+      return;
+    }
     if (resolving) {
       if (!resolutionPhotos.length) {
         setResolutionError('Bitte zuerst mindestens ein Nachher-Foto aufnehmen oder auswählen.');
@@ -138,10 +144,12 @@ export function DefectRow({
           </fieldset>}
           {resolutionError && <p role="alert" className="text-sm text-danger sm:col-span-2" data-testid={`followup-error-${defect.id}`}>{resolutionError}</p>}
           {fixed === 'no' && <Field label="Neuer Termin" htmlFor={`newdue-${defect.id}`}><input id={`newdue-${defect.id}`} type="date" className="field" value={newDue} onChange={(event) => setNewDue(event.target.value)} /></Field>}
-          <Field label="Bemerkung" htmlFor={`follow-note-${defect.id}`}><input id={`follow-note-${defect.id}`} className="field" value={note} onChange={(event) => setNote(event.target.value)} /></Field>
+          <Field label={reasonRequired ? 'Bemerkung / Grund (Pflicht)' : 'Bemerkung'} htmlFor={`follow-note-${defect.id}`} hint={reasonRequired ? 'Bitte kurz erklären, was noch offen ist und warum.' : undefined}>
+            <input id={`follow-note-${defect.id}`} className="field" value={note} required={reasonRequired} aria-required={reasonRequired} onChange={(event) => { setNote(event.target.value); setResolutionError(''); }} />
+          </Field>
           <div className="flex gap-2 sm:col-span-2">
             <button type="button" className="btn-secondary flex-1" onClick={() => setEditingFollowup(false)} disabled={savingFollowup}>Abbrechen</button>
-            <button type="button" className="btn-primary flex-1" onClick={() => void saveFollowup()} disabled={savingFollowup || fixed === 'no' && !newDue || resolving && !resolutionPhotos.length} data-testid={`save-followup-${defect.id}`}>{savingFollowup ? 'Speichert …' : 'Nachkontrolle speichern'}</button>
+            <button type="button" className="btn-primary flex-1" onClick={() => void saveFollowup()} disabled={savingFollowup || fixed === 'no' && !newDue || reasonMissing || resolving && !resolutionPhotos.length} data-testid={`save-followup-${defect.id}`}>{savingFollowup ? 'Speichert …' : 'Nachkontrolle speichern'}</button>
           </div>
         </div>
       )}

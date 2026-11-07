@@ -347,3 +347,39 @@ test('offenen Punkt aus dem vorherigen Rundgang mit Foto und Dankessatz abschlie
   expect(pdfText).toContain('Nachher-Foto');
   expect(pdfText).toMatch(/(Sehr gut gemacht|Stark umgesetzt|Sauber erledigt|Prima gelöst|Klasse Einsatz)/);
 });
+
+test('Begründung für einen Mangel in Bearbeitung ist Pflicht und erscheint im PDF', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('new-walk').click();
+  await page.getByTestId('to-checklist').click();
+  await page.getByTestId('select-area-qps').click();
+  await page.getByTestId('rate-R1@qps-mangel').click();
+  const defectSheet = page.getByRole('dialog');
+  await defectSheet.getByLabel('Beschreibung des Mangels').fill('Schutzabdeckung noch nicht montiert');
+  await defectSheet.getByLabel('Festgestellte Gefahr').fill('Bewegliche Teile noch erreichbar');
+  await defectSheet.getByTestId('defect-save').click();
+  await expect(defectSheet).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Zur Übersicht' }).click();
+  await page.getByTestId('new-walk').click();
+  const openPoints = page.getByTestId('open-points');
+  const carriedRow = openPoints.locator('[data-testid^="defect-"]').first();
+  await carriedRow.getByRole('button', { name: 'Nachkontrolle aktualisieren' }).click();
+  await carriedRow.getByLabel('Status').selectOption('inProgress');
+  const reason = carriedRow.getByLabel('Bemerkung / Grund (Pflicht)');
+  await expect(reason).toHaveAttribute('required', '');
+  const save = carriedRow.getByRole('button', { name: 'Nachkontrolle speichern' });
+  await expect(save).toBeDisabled();
+  await reason.fill('Ersatzteil bestellt; Lieferung wird am 12.11. erwartet.');
+  await expect(save).toBeEnabled();
+  await save.click();
+
+  await page.getByRole('link', { name: '3. Abschluss' }).click();
+  const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-pdf').click()]);
+  const pdfPath = test.info().outputPath(pdf.suggestedFilename());
+  await pdf.saveAs(pdfPath);
+  const pdfText = readFileSync(pdfPath, 'latin1');
+  expect(pdfText).toContain('In Bearbeitung');
+  expect(pdfText).toContain('Grund der noch offenen Massnahme');
+  expect(pdfText).toContain('Ersatzteil bestellt');
+});
